@@ -4,13 +4,11 @@ import './screencast.css'
 // This implementation is heavily inspired by https://cs.chromium.org/chromium/src/third_party/blink/renderer/devtools/front_end/screencast/ScreencastView.js
 
 class Screencast extends React.Component<any, any> {
-  private canvasRef: React.RefObject<HTMLCanvasElement>
   private imageRef: React.RefObject<HTMLImageElement>
   private frameId: number | null
 
   constructor(props: any) {
     super(props)
-    this.canvasRef = React.createRef()
     this.imageRef = React.createRef()
     this.frameId = null
 
@@ -116,22 +114,17 @@ class Screencast extends React.Component<any, any> {
     }
 
     if (event.type === 'mousedown') {
-      if (this.canvasRef.current)
-        this.canvasRef.current.focus()
+      if (this.imageRef.current)
+        this.imageRef.current.focus()
     }
   }
 
   private convertIntoScreenSpace(event: any, state: any) {
-    let screenOffsetTop = 0
-    if (this.canvasRef && this.canvasRef.current)
-      screenOffsetTop = this.canvasRef.current.getBoundingClientRect().top
-
     const { screenZoom } = this.props.viewportMetadata
-    const { scrollOffsetX, scrollOffsetY } = this.props.frame.metadata
 
     return {
-      x: Math.round(event.clientX / screenZoom + scrollOffsetX),
-      y: Math.round(event.clientY / screenZoom - screenOffsetTop + scrollOffsetY),
+      x: Math.round(event.nativeEvent.offsetX / screenZoom),
+      y: Math.round(event.nativeEvent.offsetY / screenZoom),
     }
   }
 
@@ -143,8 +136,8 @@ class Screencast extends React.Component<any, any> {
     if (event.key === 'Tab')
       event.preventDefault()
 
-    if (this.canvasRef.current)
-      this.canvasRef.current.focus()
+    if (this.imageRef.current)
+      this.imageRef.current.focus()
   }
 
   private modifiersForEvent(event: any) {
