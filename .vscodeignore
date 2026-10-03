@@ -15,3 +15,5 @@ tsconfig.json
 vite.config.ts
 resources/*.svg
 bin/**
+bench/**
+engine/**
