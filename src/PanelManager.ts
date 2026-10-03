@@ -43,7 +43,7 @@ export class PanelManager extends EventEmitter.EventEmitter2 {
     panel.once('disposed', () => {
       if (this.current === panel) {
         this.current = undefined
-        commands.executeCommand('setContext', 'browse-lite-active', false)
+        commands.executeCommand('setContext', 'amaze-browser-active', false)
       }
       this.panels.delete(panel)
       if (this.panels.size === 0) {
@@ -60,13 +60,13 @@ export class PanelManager extends EventEmitter.EventEmitter2 {
 
     panel.on('focus', () => {
       this.current = panel
-      commands.executeCommand('setContext', 'browse-lite-active', true)
+      commands.executeCommand('setContext', 'amaze-browser-active', true)
     })
 
     panel.on('blur', () => {
       if (this.current === panel) {
         this.current = undefined
-        commands.executeCommand('setContext', 'browse-lite-active', false)
+        commands.executeCommand('setContext', 'amaze-browser-active', false)
       }
     })
 
@@ -88,7 +88,7 @@ export class PanelManager extends EventEmitter.EventEmitter2 {
       return
 
     const panel = await this.create(`file://${filepath}`)
-    if (getConfig('browse-lite.localFileAutoReload')) {
+    if (getConfig('amaze-browser.localFileAutoReload')) {
       panel.disposables.push(
         workspace.createFileSystemWatcher(filepath, true, false, false).onDidChange(() => {
         // TODO: check filename

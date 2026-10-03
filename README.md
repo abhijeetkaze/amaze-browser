@@ -1,30 +1,28 @@
 <p align="center">
-<img src="https://antfu.gallerycdn.vsassets.io/extensions/antfu/browse-lite/0.0.11/1614585407925/Microsoft.VisualStudio.Services.Icons.Default" alt="Logo" height="100"/>
+<img src="resources/icon.png" alt="Amaze Browser" height="100"/>
 </p>
 
 <h1 align="center">
-Browse Lite
+Amaze Browser
 </h1>
 <p align="center">
-Embedded browser in VS Code
+A fast, embedded Chromium browser right inside VS Code
 </p>
 <p align="center">
-<a href="https://marketplace.visualstudio.com/items?itemName=antfu.browse-lite" target="__blank"><img src="https://img.shields.io/visual-studio-marketplace/v/antfu.browse-lite.svg?color=228cb3&amp;label=" alt="Visual Studio Marketplace Version" /></a>
-</h1>
+<a href="https://open-vsx.org/extension/abhijeetkaze/amaze-browser" target="__blank"><img src="https://img.shields.io/open-vsx/v/abhijeetkaze/amaze-browser?color=228cb3&label=Open%20VSX" alt="Open VSX Version" /></a>
+</p>
 
-> Forked from [Browser Preview](https://github.com/auchenberg/vscode-browser-preview) by [Kenneth Auchenberg](https://github.com/auchenberg)
-
-- ⚡️ Faster page refreshing
-- 🌗 Dark mode aware
-- 🎨 Theme-aware UI
-- 🐞 Built-in devtools support
-- 🔌 Extendable actions
+- ⚡️ Fast page refreshing
+- 🧭 Bundled Chromium on Linux, nothing else to install
+- 🐞 Built-in DevTools
+- 📱 Device emulation
+- 🖱️ Right-click menu for links, images, text and the page
+- 🌗 Dark mode and theme aware
 - 🖥 Re-open in the system browser
-- ✅ No Telemetry
-- 🍃 Much lighter [`10.3MB` ➡️ `212KB`](https://user-images.githubusercontent.com/11247099/109819001-90a65a00-7c6e-11eb-8d82-465ec8b22eba.png)
+- ✅ No telemetry
 
 <p align="center">
-<table><tr><td>Run <b><code>Browse Lite: Open...</code></b> command to start the browser</tr></td></table>
+<table><tr><td>Run <b><code>Amaze Browser: Open...</code></b> command to start the browser</tr></td></table>
 </p>
 
 <p align="center">
@@ -32,54 +30,48 @@ Embedded browser in VS Code
 <img width="1192" alt="Preview 2" src="https://user-images.githubusercontent.com/11247099/109469308-d1547680-7aa8-11eb-9957-23a4d8ac35e6.png">
 </p>
 
-This extension was originally built for [VS Code for Vite](https://github.com/antfu/vscode-vite).
-
 ## Browser
 
-Browse Lite picks the browser in this order:
+Amaze Browser picks the browser in this order:
 
-1. The executable set in `browse-lite.chromeExecutable`
-2. **Linux only:** a Chromium build that Browse Lite downloads itself
+1. The executable set in `amaze-browser.chromeExecutable`
+2. **Linux only:** a Chromium build that Amaze Browser downloads itself
 3. A Chrome or Edge installation found on the system
 
 ### Bundled Chromium (Linux)
 
-If `browse-lite.chromeExecutable` is not set, Browse Lite downloads an open-source [Chromium snapshot](https://commondatastorage.googleapis.com/chromium-browser-snapshots/index.html?prefix=Linux_x64/) (~150MB) the first time it activates and shows the progress in a notification. Later activations reuse it.
+If `amaze-browser.chromeExecutable` is not set, Amaze Browser downloads an open-source [Chromium snapshot](https://commondatastorage.googleapis.com/chromium-browser-snapshots/index.html?prefix=Linux_x64/) (~150MB) the first time it activates and shows the progress in a notification. Later activations reuse it.
 
 It is saved in the extension's global storage folder:
 
 ```
-~/.config/Code/User/globalStorage/antfu.browse-lite/chromium/chromium/linux-<build>/chrome-linux/chrome
+~/.config/Code/User/globalStorage/abhijeetkaze.amaze-browser/chromium/chromium/linux-<build>/chrome-linux/chrome
 ```
 
 The first part of the path depends on how you run VS Code:
 
 | Setup | Global storage folder |
 | --- | --- |
-| VS Code | `~/.config/Code/User/globalStorage/antfu.browse-lite/` |
-| VS Code Insiders | `~/.config/Code - Insiders/User/globalStorage/antfu.browse-lite/` |
-| VSCodium | `~/.config/VSCodium/User/globalStorage/antfu.browse-lite/` |
-| Remote-SSH / WSL | `~/.vscode-server/data/User/globalStorage/antfu.browse-lite/` |
+| VS Code | `~/.config/Code/User/globalStorage/abhijeetkaze.amaze-browser/` |
+| VS Code Insiders | `~/.config/Code - Insiders/User/globalStorage/abhijeetkaze.amaze-browser/` |
+| VSCodium | `~/.config/VSCodium/User/globalStorage/abhijeetkaze.amaze-browser/` |
+| Remote-SSH / WSL | `~/.vscode-server/data/User/globalStorage/abhijeetkaze.amaze-browser/` |
 
 Things to know:
 
 - The build is pinned by `CHROMIUM_BUILD_ID` in [`src/ChromiumDownloader.ts`](src/ChromiumDownloader.ts). When it changes, the new build is downloaded once and older builds are deleted.
 - The download is kept across extension updates and removed by VS Code when the extension is uninstalled.
-- Chromium needs the usual system libraries (for example `libnss3`, `libatk-bridge2.0-0`, `libgbm1`). If they are missing, install them or set `browse-lite.chromeExecutable` to another browser.
-- If the download fails, Browse Lite shows a warning, falls back to a system browser and tries the download again on the next launch.
+- Chromium needs the usual system libraries (for example `libnss3`, `libatk-bridge2.0-0`, `libgbm1`). If they are missing, install them or set `amaze-browser.chromeExecutable` to another browser.
+- If the download fails, Amaze Browser shows a warning, falls back to a system browser and tries the download again on the next launch.
 
-## Sponsors
+## Credits
 
-This project is part of my [Sponsor Program](https://github.com/sponsors/antfu).
-
-<p align="center">
-  <a href="https://cdn.jsdelivr.net/gh/antfu/static/sponsors.svg">
-    <img src='https://cdn.jsdelivr.net/gh/antfu/static/sponsors.png'/>
-  </a>
-</p>
+Amaze Browser is a fork of [Browse Lite](https://github.com/antfu/vscode-browse-lite) by [Anthony Fu](https://github.com/antfu), which was itself forked from [Browser Preview](https://github.com/auchenberg/vscode-browser-preview) by [Kenneth Auchenberg](https://github.com/auchenberg). Thanks to both for the original work.
 
 ## License
 
 MIT - Copyright (c) 2019 Kenneth Auchenberg
 
 MIT - Copyright (c) 2021 Anthony Fu
+
+MIT - Copyright (c) 2026 Abhijeet Mohanta

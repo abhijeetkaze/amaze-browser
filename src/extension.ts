@@ -12,17 +12,17 @@ export function activate(ctx: ExtensionContext) {
 
   // Download Chromium in the background on first activation (Linux only),
   // unless the user has configured their own executable
-  if (!getConfig<string>('browse-lite.chromeExecutable'))
+  if (!getConfig<string>('amaze-browser.chromeExecutable'))
     ensureChromium(ctx)
 
   ctx.subscriptions.push(
 
     debug.registerDebugConfigurationProvider(
-      'browse-lite',
+      'amaze-browser',
       debugProvider.getProvider(),
     ),
 
-    commands.registerCommand('browse-lite.open', async (url?: string | Uri) => {
+    commands.registerCommand('amaze-browser.open', async (url?: string | Uri) => {
       try {
         return await manager.create(url)
       }
@@ -31,20 +31,20 @@ export function activate(ctx: ExtensionContext) {
       }
     }),
 
-    commands.registerCommand('browse-lite.openActiveFile', () => {
+    commands.registerCommand('amaze-browser.openActiveFile', () => {
       const filename = window.activeTextEditor?.document?.fileName
       manager.createFile(filename)
     }),
 
-    commands.registerCommand('browse-lite.controls.refresh', () => {
+    commands.registerCommand('amaze-browser.controls.refresh', () => {
       manager.current?.reload()
     }),
 
-    commands.registerCommand('browse-lite.controls.external', () => {
+    commands.registerCommand('amaze-browser.controls.external', () => {
       manager.current?.openExternal(true)
     }),
 
-    commands.registerCommand('browse-lite.controls.debug', async () => {
+    commands.registerCommand('amaze-browser.controls.debug', async () => {
       const panel = await manager.current?.createDebugPanel()
       panel?.show()
     }),
@@ -55,7 +55,7 @@ export function activate(ctx: ExtensionContext) {
     // https://code.visualstudio.com/updates/v1_53#_external-uri-opener
     // @ts-expect-error proposed API
     ctx.subscriptions.push(window.registerExternalUriOpener?.(
-      'browse-lite.opener',
+      'amaze-browser.opener',
       {
         canOpenExternalUri: () => 2,
         openExternalUri(resolveUri: Uri) {
@@ -64,7 +64,7 @@ export function activate(ctx: ExtensionContext) {
       },
       {
         schemes: ['http', 'https'],
-        label: 'Open URL using Browse Lite',
+        label: 'Open URL using Amaze Browser',
       },
     ))
   }

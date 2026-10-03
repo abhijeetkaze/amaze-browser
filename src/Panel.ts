@@ -9,7 +9,7 @@ import type { ExtensionConfiguration } from './ExtensionConfiguration'
 import { ContentProvider } from './ContentProvider'
 
 export class Panel extends EventEmitter2 {
-  private static readonly viewType = 'browse-lite'
+  private static readonly viewType = 'amaze-browser'
   private _panel: WebviewPanel | null
   public disposables: Disposable[] = []
   public url = ''
@@ -56,7 +56,7 @@ export class Panel extends EventEmitter2 {
 
     this._panel = window.createWebviewPanel(
       Panel.viewType,
-      'Browse Lite',
+      'Amaze Browser',
       this.isDebugPage ? ViewColumn.Three : ViewColumn.Two,
       {
         enableScripts: true,
@@ -186,13 +186,13 @@ export class Panel extends EventEmitter2 {
     const panel = new Panel(this.config, this.browser, this)
     this.debugPanel = panel
     panel.on('focus', () => {
-      commands.executeCommand('setContext', 'browse-lite-debug-active', true)
+      commands.executeCommand('setContext', 'amaze-browser-debug-active', true)
     })
     panel.on('blur', () => {
-      commands.executeCommand('setContext', 'browse-lite-debug-active', false)
+      commands.executeCommand('setContext', 'amaze-browser-debug-active', false)
     })
     panel.once('disposed', () => {
-      commands.executeCommand('setContext', 'browse-lite-debug-active', false)
+      commands.executeCommand('setContext', 'amaze-browser-debug-active', false)
       this.debugPanel = undefined
     })
     const domain = `${this.config.debugHost}:${this.config.debugPort}`

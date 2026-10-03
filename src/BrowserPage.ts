@@ -5,10 +5,10 @@ import { isDarkTheme } from './Config'
 import type { ContextMenuInfo } from './ContextMenuInfo'
 
 enum ExposedFunc {
-  EmitCopy = 'EMIT_BROWSER_LITE_ON_COPY',
-  GetPaste = 'EMIT_BROWSER_LITE_GET_PASTE',
-  EnableCopyPaste = 'ENABLE_BROWSER_LITE_HOOK_COPY_PASTE',
-  EmitContextMenu = 'EMIT_BROWSER_LITE_ON_CONTEXT_MENU',
+  EmitCopy = 'EMIT_AMAZE_BROWSER_ON_COPY',
+  GetPaste = 'EMIT_AMAZE_BROWSER_GET_PASTE',
+  EnableCopyPaste = 'ENABLE_AMAZE_BROWSER_HOOK_COPY_PASTE',
+  EmitContextMenu = 'EMIT_AMAZE_BROWSER_ON_CONTEXT_MENU',
 }
 
 export class BrowserPage extends EnhancedEventEmitter {

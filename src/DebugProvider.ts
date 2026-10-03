@@ -8,7 +8,7 @@ export class DebugProvider {
 
   constructor(private manager: PanelManager) {
     debug.onDidTerminateDebugSession((e: DebugSession) => {
-      if (e.name === 'Browse Lite: Launch' && e.configuration.urlFilter) {
+      if (e.name === 'Amaze Browser: Launch' && e.configuration.urlFilter) {
         // TODO: Improve this with some unique ID per browser window instead of url, to avoid closing multiple instances
         this.manager.disposeByUrl(e.configuration.urlFilter)
       }
@@ -39,14 +39,14 @@ export class DebugProvider {
       ): ProviderResult<DebugConfiguration[]> {
         return Promise.resolve([
           {
-            type: 'browse-lite',
-            name: 'Browse Lite: Attach',
+            type: 'amaze-browser',
+            name: 'Amaze Browser: Attach',
             request: 'attach',
           },
           {
-            type: 'browse-lite',
+            type: 'amaze-browser',
             request: 'launch',
-            name: 'Browse Lite: Launch',
+            name: 'Amaze Browser: Launch',
             url: 'http://localhost:3000',
           },
         ])
@@ -57,14 +57,14 @@ export class DebugProvider {
         token?: CancellationToken,
         // @ts-expect-error
       ): ProviderResult<DebugConfiguration> {
-        if (!config || config.type !== 'browse-lite')
+        if (!config || config.type !== 'amaze-browser')
           return null
 
         config.type = debugType
         config._browseLite = true
 
         if (config.request === 'launch') {
-          config.name = 'Browse Lite: Launch'
+          config.name = 'Amaze Browser: Launch'
           config.port = manager.config.debugPort
           config.request = 'attach'
           config.urlFilter = config.url
@@ -72,7 +72,7 @@ export class DebugProvider {
 
           if (config.port === null) {
             window.showErrorMessage(
-              'Could not launch Browse Lite window',
+              'Could not launch Amaze Browser window',
             )
           }
           else {
@@ -80,12 +80,12 @@ export class DebugProvider {
           }
         }
         else if (config.request === 'attach') {
-          config.name = 'Browse Lite: Attach'
+          config.name = 'Amaze Browser: Attach'
           config.port = manager.config.debugPort
 
           if (config.port === null) {
             window.showErrorMessage(
-              'No Browse Lite window was found. Open a Browse Lite window or use the "launch" request type.',
+              'No Amaze Browser window was found. Open a Amaze Browser window or use the "launch" request type.',
             )
           }
           else {

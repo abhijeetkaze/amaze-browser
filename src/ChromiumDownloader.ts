@@ -52,7 +52,7 @@ async function downloadChromium(cacheDir: string) {
   return await window.withProgress(
     {
       location: ProgressLocation.Notification,
-      title: `Browse Lite: Downloading Chromium (r${buildId})`,
+      title: `Amaze Browser: Downloading Chromium (r${buildId})`,
     },
     async (progress) => {
       let reported = 0
@@ -77,7 +77,7 @@ async function downloadChromium(cacheDir: string) {
 }
 
 /**
- * Returns the path of the Chromium managed by Browse Lite, downloading it on first use.
+ * Returns the path of the Chromium managed by Amaze Browser, downloading it on first use.
  * Only supported on Linux; resolves to undefined elsewhere or when the download fails.
  */
 export function ensureChromium(ctx: ExtensionContext): Promise<string | undefined> {
@@ -94,7 +94,7 @@ export function ensureChromium(ctx: ExtensionContext): Promise<string | undefine
       }
       catch (e) {
         console.error(e)
-        window.showWarningMessage(`Browse Lite: Failed to download Chromium: ${e instanceof Error ? e.message : e}`)
+        window.showWarningMessage(`Amaze Browser: Failed to download Chromium: ${e instanceof Error ? e.message : e}`)
         // allow retrying on next launch
         pending = undefined
         return undefined

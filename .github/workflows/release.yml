@@ -24,9 +24,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
       - run: nr build
-      - run: npx vsce publish -p ${{secrets.VSCE_TOKEN}} --no-dependencies
-        env:
-          VSCE_TOKEN: ${{secrets.VSCE_TOKEN}}
       - run: npx ovsx publish -p ${{secrets.OVSX_TOKEN}} --no-dependencies
         env:
           OVSX_TOKEN: ${{secrets.OVSX_TOKEN}}

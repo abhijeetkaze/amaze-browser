@@ -1,21 +1,31 @@
 {
-  "publisher": "antfu",
-  "name": "browse-lite",
-  "displayName": "Browse Lite",
+  "publisher": "abhijeetkaze",
+  "name": "amaze-browser",
+  "displayName": "Amaze Browser",
   "version": "0.3.9",
   "packageManager": "pnpm@8.9.2",
-  "description": "Embedded browser in VS Code.",
+  "description": "A fast embedded Chromium browser inside VS Code, with DevTools, device emulation and live preview.",
   "author": {
-    "name": "Anthony Fu",
-    "email": "hi@antfu.me"
+    "name": "Abhijeet Mohanta",
+    "url": "https://github.com/abhijeetkaze"
   },
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/antfu/vscode-browse-lite.git"
+    "url": "https://github.com/abhijeetkaze/vscode-browse-lite.git"
   },
   "categories": [
-    "Other"
+    "Other",
+    "Debuggers"
+  ],
+  "keywords": [
+    "browser",
+    "preview",
+    "live preview",
+    "chromium",
+    "devtools",
+    "web",
+    "embedded browser"
   ],
   "main": "./dist/extension.js",
   "icon": "resources/icon.png",
@@ -32,62 +42,62 @@
   "contributes": {
     "commands": [
       {
-        "category": "Browse Lite",
-        "command": "browse-lite.open",
+        "category": "Amaze Browser",
+        "command": "amaze-browser.open",
         "title": "Open..."
       },
       {
-        "category": "Browse Lite",
-        "command": "browse-lite.openActiveFile",
+        "category": "Amaze Browser",
+        "command": "amaze-browser.openActiveFile",
         "title": "Open Active File in Preview"
       },
       {
-        "category": "Browse Lite",
-        "command": "browse-lite.controls.refresh",
+        "category": "Amaze Browser",
+        "command": "amaze-browser.controls.refresh",
         "title": "Refresh Page",
         "icon": "$(refresh)"
       },
       {
-        "category": "Browse Lite",
-        "command": "browse-lite.controls.external",
+        "category": "Amaze Browser",
+        "command": "amaze-browser.controls.external",
         "title": "Open page with system browser",
         "icon": "$(link-external)"
       },
       {
-        "category": "Browse Lite",
-        "command": "browse-lite.controls.debug",
+        "category": "Amaze Browser",
+        "command": "amaze-browser.controls.debug",
         "title": "Open debug page",
         "icon": "$(bug)"
       }
     ],
     "configuration": {
-      "title": "Browse Lite",
+      "title": "Amaze Browser",
       "type": "object",
       "properties": {
-        "browse-lite.startUrl": {
-          "description": "The default start url for new Browse Lite instances",
+        "amaze-browser.startUrl": {
+          "description": "The default start url for new Amaze Browser instances",
           "type": "string"
         },
-        "browse-lite.chromeExecutable": {
-          "description": "The full path to the executable, including the complete filename of the executable. When empty on Linux, Browse Lite downloads and uses its own Chromium build.",
+        "amaze-browser.chromeExecutable": {
+          "description": "The full path to the executable, including the complete filename of the executable. When empty on Linux, Amaze Browser downloads and uses its own Chromium build.",
           "type": "string"
         },
-        "browse-lite.verbose": {
+        "amaze-browser.verbose": {
           "default": false,
           "description": "Toggles verbose logging",
           "type": "boolean"
         },
-        "browse-lite.debugHost": {
+        "amaze-browser.debugHost": {
           "default": "localhost",
           "description": "Host name for debug",
           "type": "string"
         },
-        "browse-lite.debugPort": {
+        "amaze-browser.debugPort": {
           "default": 9222,
           "description": "Port number for debug, when occupied, it will try to find another one by self bumpping.",
           "type": "number"
         },
-        "browse-lite.format": {
+        "amaze-browser.format": {
           "default": "png",
           "enum": [
             "png",
@@ -96,36 +106,36 @@
           "description": "The type of image used in rendering preview.",
           "type": "string"
         },
-        "browse-lite.ignoreHttpsErrors": {
+        "amaze-browser.ignoreHttpsErrors": {
           "default": true,
           "description": "Ignore HTTPS errors if you are using self-signed SSL certificates",
           "type": "boolean"
         },
-        "browse-lite.quality": {
+        "amaze-browser.quality": {
           "default": 100,
           "description": "Image quality of screencasting",
           "type": "number"
         },
-        "browse-lite.everyNthFrame": {
+        "amaze-browser.everyNthFrame": {
           "default": 1,
           "description": "Skip for frames of screencasting",
           "type": "number"
         },
-        "browse-lite.localFileAutoReload": {
+        "amaze-browser.localFileAutoReload": {
           "default": true,
           "description": "Automatically reload page on local file changes",
           "type": "boolean"
         },
-        "browse-lite.storeUserData": {
+        "amaze-browser.storeUserData": {
           "default": true,
           "description": "Store cookies, localStorage, etc. on disk, so that you don't lose them when you close session. This will help you not get logged out.",
           "type": "boolean"
         },
-        "browse-lite.proxy": {
+        "amaze-browser.proxy": {
           "description": "Add proxy parameters during initial loading of the browser.",
           "type": "string"
         },
-        "browse-lite.otherArgs": {
+        "amaze-browser.otherArgs": {
           "description": "Add other parameters during initial loading of the browser.",
           "type": "string"
         }
@@ -133,26 +143,26 @@
     },
     "debuggers": [
       {
-        "type": "browse-lite",
-        "label": "Browse Lite",
+        "type": "amaze-browser",
+        "label": "Amaze Browser",
         "configurationSnippets": [
           {
-            "label": "Browse Lite: Launch",
-            "description": "Launch Browse Lite to localhost",
+            "label": "Amaze Browser: Launch",
+            "description": "Launch Amaze Browser to localhost",
             "body": {
-              "type": "browse-lite",
+              "type": "amaze-browser",
               "request": "launch",
-              "name": "Browse Lite: Launch",
+              "name": "Amaze Browser: Launch",
               "url": "http://localhost:3000"
             }
           },
           {
-            "label": "Browse Lite: Attach",
-            "description": "Attach to open Browse Lite instances",
+            "label": "Amaze Browser: Attach",
+            "description": "Attach to open Amaze Browser instances",
             "body": {
-              "type": "browse-lite",
+              "type": "amaze-browser",
               "request": "attach",
-              "name": "Browse Lite: Attach"
+              "name": "Amaze Browser: Attach"
             }
           }
         ],
@@ -251,27 +261,27 @@
     "menus": {
       "editor/title": [
         {
-          "when": "resourceScheme == webview-panel && browse-lite-active",
-          "command": "browse-lite.controls.external",
+          "when": "resourceScheme == webview-panel && amaze-browser-active",
+          "command": "amaze-browser.controls.external",
           "group": "navigation"
         },
         {
-          "when": "resourceScheme == webview-panel && browse-lite-active && !browse-lite-debug-active",
-          "command": "browse-lite.controls.debug",
+          "when": "resourceScheme == webview-panel && amaze-browser-active && !amaze-browser-debug-active",
+          "command": "amaze-browser.controls.debug",
           "group": "navigation"
         }
       ],
       "commandPalette": [
         {
-          "command": "browse-lite.controls.refresh",
+          "command": "amaze-browser.controls.refresh",
           "when": "false"
         },
         {
-          "command": "browse-lite.controls.external",
+          "command": "amaze-browser.controls.external",
           "when": "false"
         },
         {
-          "command": "browse-lite.controls.debug",
+          "command": "amaze-browser.controls.debug",
           "when": "false"
         }
       ]
@@ -279,7 +289,7 @@
   },
   "scripts": {
     "build:dev": "vite build && npm run build:ts",
-    "publish": "vsce publish --no-dependencies",
+    "publish": "ovsx publish --no-dependencies",
     "pack": "vsce package --no-dependencies",
     "build": "rimraf dist && vite build && pnpm run build:ts --minify",
     "build:ts": "tsup src/extension.ts --external=vscode -d dist",
