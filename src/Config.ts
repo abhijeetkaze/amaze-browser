@@ -54,7 +54,7 @@ export function getConfigs(ctx: ExtensionContext): ExtensionConfiguration {
     format: getConfig('amaze-browser.format', 'png'),
     isVerboseMode: getConfig('amaze-browser.verbose', false),
     chromeExecutable: getConfig('amaze-browser.chromeExecutable'),
-    startUrl: getConfig('amaze-browser.startUrl', 'https://github.com/abhijeetkaze/vscode-browse-lite'),
+    startUrl: getConfig('amaze-browser.startUrl', 'https://github.com/abhijeetkaze/amaze-browser'),
     debugHost: getConfig('amaze-browser.debugHost', 'localhost'),
     debugPort: getConfig('amaze-browser.debugPort', 9222),
     storeUserData: getConfig('amaze-browser.storeUserData', true),

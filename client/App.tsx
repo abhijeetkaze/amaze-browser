@@ -568,8 +568,6 @@ class App extends React.Component<any, IState> {
         },
       })
 
-      // await this.handleHighlightNodeClickType();
-
       this.requestNodeHighlighting()
     }
   }
