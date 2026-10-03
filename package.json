@@ -14,6 +14,9 @@
     "type": "git",
     "url": "https://github.com/abhijeetkaze/amaze-browser.git"
   },
+  "sponsor": {
+    "url": "https://www.buymeacoffee.com/abhijeetkaze"
+  },
   "categories": [
     "Other",
     "Debuggers"
@@ -66,6 +69,11 @@
         "category": "Amaze Browser",
         "command": "amaze-browser.clearBrowsingData",
         "title": "Clear History and Cookies"
+      },
+      {
+        "category": "Amaze Browser",
+        "command": "amaze-browser.showSupportPrompt",
+        "title": "Show Support Notification"
       },
       {
         "category": "Amaze Browser",
@@ -125,6 +133,11 @@
           "description": "Where DevTools opens. Change it any time with the Move DevTools button in the DevTools tab.",
           "type": "string"
         },
+        "amaze-browser.showSupportPrompt": {
+          "default": true,
+          "description": "Occasionally ask whether you'd like to support Amaze Browser (at most twice, only after regular use).",
+          "type": "boolean"
+        },
         "amaze-browser.verbose": {
           "default": false,
           "description": "Toggles verbose logging",
@@ -141,7 +154,7 @@
           "type": "number"
         },
         "amaze-browser.format": {
-          "default": "png",
+          "default": "jpeg",
           "enum": [
             "png",
             "jpeg"

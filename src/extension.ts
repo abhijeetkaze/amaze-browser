@@ -39,6 +39,8 @@ export function activate(ctx: ExtensionContext) {
 
     commands.registerCommand('amaze-browser.clearBrowsingData', () => manager.clearBrowsingData()),
 
+    commands.registerCommand('amaze-browser.showSupportPrompt', () => manager.supportPrompt.show()),
+
     commands.registerCommand('amaze-browser.openActiveFile', () => {
       const filename = window.activeTextEditor?.document?.fileName
       manager.createFile(filename)

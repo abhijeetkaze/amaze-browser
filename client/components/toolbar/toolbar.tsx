@@ -174,6 +174,7 @@ class Toolbar extends React.Component<IToolbarProps, IToolbarState> {
       ...items,
       null,
       { label: 'Clear History and Cookies...', action: () => this.props.onActionInvoked('clearBrowsingData') },
+      { label: 'Support Amaze Browser', action: () => this.props.onActionInvoked('support') },
     ]
   }
 

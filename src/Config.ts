@@ -51,7 +51,7 @@ export function getConfigs(ctx: ExtensionContext): ExtensionConfiguration {
     isDebug: false,
     quality: getConfig('amaze-browser.quality', 100),
     everyNthFrame: getConfig('amaze-browser.everyNthFrame', 1),
-    format: getConfig('amaze-browser.format', 'png'),
+    format: getConfig('amaze-browser.format', 'jpeg'),
     isVerboseMode: getConfig('amaze-browser.verbose', false),
     chromeExecutable: getConfig('amaze-browser.chromeExecutable'),
     startUrl: getConfig('amaze-browser.startUrl', 'https://github.com/abhijeetkaze/amaze-browser'),

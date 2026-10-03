@@ -13,6 +13,7 @@
   <a href="https://open-vsx.org/extension/abhijeetkaze/amaze-browser"><img src="https://img.shields.io/open-vsx/v/abhijeetkaze/amaze-browser?style=flat-square&label=Open%20VSX&color=8B5CF6" alt="Open VSX version"/></a>
   <a href="https://open-vsx.org/extension/abhijeetkaze/amaze-browser"><img src="https://img.shields.io/open-vsx/dt/abhijeetkaze/amaze-browser?style=flat-square&label=downloads&color=22D3EE" alt="Open VSX downloads"/></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-0F172A?style=flat-square" alt="MIT license"/></a>
+  <a href="https://www.buymeacoffee.com/abhijeetkaze"><img src="https://img.shields.io/badge/buy%20me%20a%20coffee-FFDD00?style=flat-square&logo=buymeacoffee&logoColor=black" alt="Buy me a coffee"/></a>
 </p>
 
 <p align="center">
@@ -94,6 +95,7 @@ When a page asks you to choose a file to upload, VS Code's file picker opens in 
 | `Amaze Browser: Show History` | Pick one of your 10 most recent pages |
 | `Amaze Browser: Move DevTools...` | Put DevTools on the right, bottom or left, or in a separate window |
 | `Amaze Browser: Clear History and Cookies` | Delete history and all cookies (asks first) |
+| `Amaze Browser: Show Support Notification` | Show the option to buy me a coffee |
 | `Amaze Browser: Open Active File in Preview` | Open the current file, reloading on save |
 | `Amaze Browser: Refresh Page` | Reload the current page |
 | `Amaze Browser: Open page with system browser` | Open the current page in your default browser |
@@ -127,11 +129,12 @@ Use `"request": "attach"` to attach to a page that's already open.
 | `amaze-browser.downloadPath` | `~/Downloads` | Folder where downloads are saved |
 | `amaze-browser.proxy` | | Proxy server, for example `http://127.0.0.1:8080` |
 | `amaze-browser.otherArgs` | | Extra Chromium command-line arguments |
-| `amaze-browser.format` | `png` | Image format for rendering the page (`png` or `jpeg`) |
+| `amaze-browser.format` | `jpeg` | Image format for rendering the page (`png` or `jpeg`) |
 | `amaze-browser.quality` | `100` | Image quality for rendering (lower is faster) |
 | `amaze-browser.everyNthFrame` | `1` | Render every Nth frame (higher is lighter on CPU) |
 | `amaze-browser.debugHost` | `localhost` | Host for the debugging connection |
 | `amaze-browser.debugPort` | `9222` | Port for the debugging connection. The next free port is used if it's taken |
+| `amaze-browser.showSupportPrompt` | `true` | Occasionally ask whether you'd like to support the project (at most twice, only after regular use) |
 | `amaze-browser.verbose` | `false` | Log protocol messages for troubleshooting |
 
 ## Which browser is used
@@ -178,6 +181,12 @@ pnpm run build:dev   # build the webview and the extension
 Then press <kbd>F5</kbd> in VS Code to launch an Extension Development Host with Amaze Browser loaded.
 
 The extension icon is drawn in [`resources/icon.svg`](resources/icon.svg). After editing it, export it to a 256×256 `resources/icon.png`.
+
+## Support
+
+Amaze Browser is free and open source. If it saves you time, you can buy me a coffee to support its development.
+
+<a href="https://www.buymeacoffee.com/abhijeetkaze"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy me a coffee" width="217" height="60"/></a>
 
 ## Credits
 

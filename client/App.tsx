@@ -78,7 +78,7 @@ class App extends React.Component<any, IState> {
     super(props)
     this.state = {
       frame: null,
-      format: 'png',
+      format: 'jpeg',
       url: 'about:blank',
       quality: 100,
       everyNthFrame: 1,
@@ -670,6 +670,9 @@ class App extends React.Component<any, IState> {
         break
       case 'clearBrowsingData':
         this.connection.send('extension.clearBrowsingData')
+        break
+      case 'support':
+        this.connection.send('extension.support')
         break
       case 'readClipboard':
         return this.connection.send('Clipboard.readText')
