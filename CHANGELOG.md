@@ -3,6 +3,13 @@
 All notable changes to Amaze Browser are documented here.
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [1.5.1] - 2026-10-03
+
+### Changed
+
+- A **⋮** menu at the end of the address bar holds **Open DevTools**, **Move DevTools...**, **Open in System Browser** and **Start HTTP Server**; it replaces the bug icon in the editor's title bar
+- The commands "Open debug page" and "Open page with system browser" are now **Open DevTools** and **Open in System Browser**
+
 ## [1.5.0] - 2026-10-03
 
 ### Added
@@ -104,6 +111,7 @@ The first release of Amaze Browser, a fork of [Browse Lite](https://github.com/a
 - Panels moved to another window reconnect instead of coming back blank
 - No orange focus outline in inputs, broken-image icon before the first frame, or wrong viewport background
 
+[1.5.1]: https://github.com/abhijeetkaze/amaze-browser/releases/tag/v1.5.1
 [1.5.0]: https://github.com/abhijeetkaze/amaze-browser/releases/tag/v1.5.0
 [1.4.1]: https://github.com/abhijeetkaze/amaze-browser/releases/tag/v1.4.1
 [1.4.0]: https://github.com/abhijeetkaze/amaze-browser/releases/tag/v1.4.0
