@@ -49,3 +49,10 @@ jobs:
           gh release create "v$version" bin/*.vsix --title "v$version" --notes-file notes.md --target "$GITHUB_SHA"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # publishes to open-vsx.org; versions already published are skipped
+      - name: Publish to Open VSX
+        if: github.ref == 'refs/heads/main'
+        run: npx ovsx publish --packagePath bin/*.vsix --pat "$OVSX_PAT" --skip-duplicate
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
