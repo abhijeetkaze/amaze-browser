@@ -62,6 +62,17 @@ codium --install-extension abhijeetkaze.amaze-browser
 
 To preview the HTML file you're editing, run **Amaze Browser: Open Active File in Preview**.
 
+### DevTools position
+
+DevTools opens next to the page by default. On a smaller screen, click the layout button in the DevTools tab's title bar (or run **Amaze Browser: Move DevTools...**) and choose:
+
+- **Right**: next to the page
+- **Bottom**: below the page, so both get the full width
+- **Left**: before the page
+- **Separate Window**: its own VS Code window, for a second monitor
+
+Your choice is remembered (setting `amaze-browser.devToolsPosition`).
+
 ### Tabs and history
 
 The toolbar has a **+** button for a new tab and a clock button that lists the 10 most recently visited pages across all tabs. History is kept between VS Code sessions.
@@ -81,6 +92,7 @@ When a page asks you to choose a file to upload, VS Code's file picker opens in 
 | `Amaze Browser: Open...` | Open a URL in a new browser tab |
 | `Amaze Browser: New Tab` | Open a new tab at the start page |
 | `Amaze Browser: Show History` | Pick one of your 10 most recent pages |
+| `Amaze Browser: Move DevTools...` | Put DevTools on the right, bottom or left, or in a separate window |
 | `Amaze Browser: Clear History and Cookies` | Delete history and all cookies (asks first) |
 | `Amaze Browser: Open Active File in Preview` | Open the current file, reloading on save |
 | `Amaze Browser: Refresh Page` | Reload the current page |
@@ -111,6 +123,7 @@ Use `"request": "attach"` to attach to a page that's already open.
 | `amaze-browser.storeUserData` | `true` | Keep cookies and local storage between sessions |
 | `amaze-browser.localFileAutoReload` | `true` | Reload local files when they change |
 | `amaze-browser.ignoreHttpsErrors` | `true` | Allow self-signed HTTPS certificates |
+| `amaze-browser.devToolsPosition` | `right` | Where DevTools opens: `right`, `bottom`, `left` or `window` |
 | `amaze-browser.downloadPath` | `~/Downloads` | Folder where downloads are saved |
 | `amaze-browser.proxy` | | Proxy server, for example `http://127.0.0.1:8080` |
 | `amaze-browser.otherArgs` | | Extra Chromium command-line arguments |

@@ -268,6 +268,9 @@ class App extends React.Component<any, IState> {
     this.startCasting()
 
     this.cdpHelper = new CDPHelper(this.connection)
+
+    // ask for the configuration; also happens when VS Code reloads the webview (e.g. moved to another window)
+    this.connection.send('extension.ready')
   }
 
   private async handleScreencastFrame(result: any) {

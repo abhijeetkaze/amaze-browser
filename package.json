@@ -58,6 +58,12 @@
       },
       {
         "category": "Amaze Browser",
+        "command": "amaze-browser.moveDevTools",
+        "title": "Move DevTools...",
+        "icon": "$(layout)"
+      },
+      {
+        "category": "Amaze Browser",
         "command": "amaze-browser.clearBrowsingData",
         "title": "Clear History and Cookies"
       },
@@ -100,6 +106,23 @@
         "amaze-browser.downloadPath": {
           "default": "",
           "description": "Folder where downloaded files are saved. Leave empty to use ~/Downloads.",
+          "type": "string"
+        },
+        "amaze-browser.devToolsPosition": {
+          "default": "right",
+          "enum": [
+            "right",
+            "bottom",
+            "left",
+            "window"
+          ],
+          "enumDescriptions": [
+            "Next to the page",
+            "Below the page",
+            "Before the page",
+            "In a separate VS Code window"
+          ],
+          "description": "Where DevTools opens. Change it any time with the Move DevTools button in the DevTools tab.",
           "type": "string"
         },
         "amaze-browser.verbose": {
@@ -288,6 +311,11 @@
         {
           "when": "resourceScheme == webview-panel && amaze-browser-active && !amaze-browser-debug-active",
           "command": "amaze-browser.controls.debug",
+          "group": "navigation"
+        },
+        {
+          "when": "resourceScheme == webview-panel && amaze-browser-debug-active",
+          "command": "amaze-browser.moveDevTools",
           "group": "navigation"
         }
       ],

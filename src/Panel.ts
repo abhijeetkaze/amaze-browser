@@ -7,7 +7,10 @@ import type { BrowserClient } from './BrowserClient'
 import type { BrowserPage } from './BrowserPage'
 import type { ExtensionConfiguration } from './ExtensionConfiguration'
 import type { HistoryEntry } from './HistoryEntry'
+import { getConfig } from './Config'
 import { ContentProvider } from './ContentProvider'
+
+export type DevToolsPosition = 'right' | 'bottom' | 'left' | 'window'
 
 export class Panel extends EventEmitter2 {
   private static readonly viewType = 'amaze-browser'
@@ -23,6 +26,8 @@ export class Panel extends EventEmitter2 {
   public parentPanel: Panel | undefined
   public debugPanel: Panel | undefined
   public disposed = false
+  private initialUrl: string | undefined
+  private configured = false
 
   constructor(config: ExtensionConfiguration, browser: BrowserClient, parentPanel?: Panel) {
     super()
@@ -41,7 +46,7 @@ export class Panel extends EventEmitter2 {
     return !!this.parentPanel
   }
 
-  public async launch(startUrl?: string) {
+  public async launch(startUrl?: string, column: ViewColumn = ViewColumn.Two) {
     try {
       this.browserPage = await this.browser.newPage()
       if (this.browserPage) {
@@ -58,7 +63,7 @@ export class Panel extends EventEmitter2 {
     this._panel = window.createWebviewPanel(
       Panel.viewType,
       'Amaze Browser',
-      this.isDebugPage ? ViewColumn.Three : ViewColumn.Two,
+      column,
       {
         enableScripts: true,
         retainContextWhenHidden: true,
@@ -72,6 +77,13 @@ export class Panel extends EventEmitter2 {
     this._panel.onDidChangeViewState(() => this.emit(this._panel.active ? 'focus' : 'blur'), null, this.disposables)
     this._panel.webview.onDidReceiveMessage(
       (msg) => {
+        // sent whenever the webview (re)loads, e.g. after being moved to another window
+        if (msg.type === 'extension.ready') {
+          this.sendConfiguration()
+          this.emit('ready')
+          return
+        }
+
         if (msg.type === 'extension.updateTitle') {
           this.title = msg.params.title
           if (this._panel) {
@@ -144,9 +156,8 @@ export class Panel extends EventEmitter2 {
 
         if (this.browserPage) {
           try {
-            // not sure about this one but this throws later with unhandled
-            // 'extension.appStateChanged' message
-            if (msg.type !== 'extension.appStateChanged')
+            // extension.* messages are handled above, everything else is a CDP command
+            if (!msg.type.startsWith('extension.'))
               this.browserPage.send(msg.type, msg.params, msg.callbackId)
 
             this.emit(msg.type, msg.params)
@@ -161,19 +172,24 @@ export class Panel extends EventEmitter2 {
     )
 
     if (startUrl) {
-      this.config.startUrl = startUrl
+      this.initialUrl = startUrl
       this.url = this.url || startUrl
     }
 
-    this._panel.webview.postMessage({
+    this.emit('focus')
+  }
+
+  private sendConfiguration() {
+    this._panel?.webview.postMessage({
       method: 'extension.appConfiguration',
       result: {
         ...this.config,
         isDebug: this.isDebugPage,
+        // only navigate on the first load; a reloaded webview keeps the current page
+        startUrl: this.configured ? undefined : this.initialUrl,
       },
     })
-
-    this.emit('focus')
+    this.configured = true
   }
 
   public navigateTo(url: string) {
@@ -204,9 +220,33 @@ export class Panel extends EventEmitter2 {
       commands.executeCommand('setContext', 'amaze-browser-debug-active', false)
       this.debugPanel = undefined
     })
+    const position = getConfig<DevToolsPosition>('amaze-browser.devToolsPosition', 'right')!
     const domain = `${this.config.debugHost}:${this.config.debugPort}`
-    await panel.launch(`http://${domain}/devtools/inspector.html?ws=${domain}/devtools/page/${this.browserPage.id}&experiments=true`)
+    const url = `http://${domain}/devtools/inspector.html?ws=${domain}/devtools/page/${this.browserPage.id}&experiments=true`
+
+    // place DevTools relative to this page's editor group
+    this._panel?.reveal(undefined, false)
+    let column = ViewColumn.Beside
+    if (position === 'bottom' || position === 'left') {
+      await commands.executeCommand(position === 'bottom' ? 'workbench.action.newGroupBelow' : 'workbench.action.newGroupLeft')
+      column = ViewColumn.Active
+    }
+
+    await panel.launch(url, column)
+
+    if (position === 'window') {
+      await commands.executeCommand('workbench.action.moveEditorToNewWindow').then(undefined, () => {
+        window.showWarningMessage('Amaze Browser: This version of VS Code cannot open DevTools in a separate window.')
+      })
+    }
     return panel
+  }
+
+  // reopens DevTools at the configured position
+  public async moveDevTools() {
+    this.debugPanel?.dispose()
+    const panel = await this.createDebugPanel()
+    panel?.show()
   }
 
   public reload() {

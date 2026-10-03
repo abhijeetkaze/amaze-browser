@@ -35,6 +35,8 @@ export function activate(ctx: ExtensionContext) {
 
     commands.registerCommand('amaze-browser.showHistory', () => manager.showHistory()),
 
+    commands.registerCommand('amaze-browser.moveDevTools', () => manager.moveDevTools()),
+
     commands.registerCommand('amaze-browser.clearBrowsingData', () => manager.clearBrowsingData()),
 
     commands.registerCommand('amaze-browser.openActiveFile', () => {

@@ -1,11 +1,12 @@
 import type { ExtensionContext, Uri } from 'vscode'
-import { commands, window, workspace } from 'vscode'
+import { ConfigurationTarget, commands, window, workspace } from 'vscode'
 import * as EventEmitter from 'eventemitter2'
 
 import { BrowserClient, clearSavedCookies } from './BrowserClient'
 import { History } from './History'
 import { getConfig, getConfigs } from './Config'
 import { Panel } from './Panel'
+import type { DevToolsPosition } from './Panel'
 import type { ExtensionConfiguration } from './ExtensionConfiguration'
 
 export class PanelManager extends EventEmitter.EventEmitter2 {
@@ -65,6 +66,7 @@ export class PanelManager extends EventEmitter.EventEmitter2 {
     panel.on('newTabRequested', () => this.create())
     panel.on('clearBrowsingDataRequested', () => this.clearBrowsingData())
     panel.on('pageVisited', ({ url, title }) => this.history.add(url, title))
+    panel.on('ready', () => panel.postHistory(this.history.list()))
 
     panel.on('focus', () => {
       this.current = panel
@@ -81,7 +83,6 @@ export class PanelManager extends EventEmitter.EventEmitter2 {
     this.panels.add(panel)
 
     await panel.launch(startUrl.toString())
-    panel.postHistory(this.history.list())
 
     this.emit('windowCreated', panel)
 
@@ -106,6 +107,30 @@ export class PanelManager extends EventEmitter.EventEmitter2 {
       )
     }
     return panel
+  }
+
+  public async moveDevTools() {
+    const positions: { label: string, description: string, value: DevToolsPosition }[] = [
+      { label: '$(layout-sidebar-right) Right', description: 'Next to the page', value: 'right' },
+      { label: '$(layout-panel) Bottom', description: 'Below the page', value: 'bottom' },
+      { label: '$(layout-sidebar-left) Left', description: 'Before the page', value: 'left' },
+      { label: '$(window) Separate Window', description: 'In its own VS Code window', value: 'window' },
+    ]
+    const current = getConfig<DevToolsPosition>('amaze-browser.devToolsPosition', 'right')
+    const picked = await window.showQuickPick(
+      positions.map(p => ({ ...p, detail: p.value === current ? 'Current position' : undefined })),
+      { placeHolder: 'Where should DevTools open?' },
+    )
+    if (!picked)
+      return
+
+    // remembered for the next time DevTools opens
+    await workspace.getConfiguration('amaze-browser').update('devToolsPosition', picked.value, ConfigurationTarget.Global)
+
+    const panels = [...this.panels]
+    const target = this.current?.debugPanel ? this.current : panels.find(p => p.debugPanel)
+    if (target)
+      await target.moveDevTools()
   }
 
   public async showHistory() {
