@@ -5,16 +5,17 @@ import './screencast.css'
 
 class Screencast extends React.Component<any, any> {
   private imageRef: React.RefObject<HTMLImageElement>
-  private frameId: number | null
+  // latest pointer position, resolved at most once per animation frame
+  private hoverPosition: { x: number, y: number } | null = null
+  private hoverFrameId: number | null = null
 
   constructor(props: any) {
     super(props)
     this.imageRef = React.createRef()
-    this.frameId = null
 
     this.handleMouseEvent = this.handleMouseEvent.bind(this)
     this.handleKeyEvent = this.handleKeyEvent.bind(this)
-    this.renderLoop = this.renderLoop.bind(this)
+    this.flushHover = this.flushHover.bind(this)
 
     this.state = {
       imageZoom: 1,
@@ -22,49 +23,38 @@ class Screencast extends React.Component<any, any> {
     }
   }
 
-  static getDerivedStateFromProps(nextProps: any, prevState: any) {
-    if (nextProps.frame !== prevState.frame) {
-      return {
-        frame: nextProps.frame,
-      }
-    }
-    else { return null }
-  }
-
-  public componentDidMount() {
-    this.startLoop()
-  }
-
   public componentWillUnmount() {
-    this.stopLoop()
+    if (this.hoverFrameId !== null)
+      window.cancelAnimationFrame(this.hoverFrameId)
   }
 
-  public startLoop() {
-    if (!this.frameId)
-      this.frameId = window.requestAnimationFrame(this.renderLoop)
-  }
-
-  public stopLoop() {
-    if (this.frameId)
-      window.cancelAnimationFrame(this.frameId)
-  }
-
-  public renderLoop() {
-    this.frameId = window.requestAnimationFrame(this.renderLoop) // Set up next iteration of the loop
+  /**
+   * Shows a frame without re-rendering; resolves once it is decoded and ready to
+   * paint, so the caller can ack it then and Chromium never runs ahead of the view.
+   */
+  public async paintFrame(base64Data: string, format: string) {
+    const image = this.imageRef.current
+    if (!image)
+      return
+    // the previous frame stays on screen until this one is decoded
+    image.src = `data:image/${format};base64,${base64Data}`
+    try {
+      await image.decode()
+    }
+    catch {
+      // superseded by a newer frame, or not decodable
+    }
   }
 
   public render() {
     const canvasStyle = {
       cursor: this.props.viewportMetadata?.cursor || 'auto',
     }
-    const base64Data = this.props.frame?.base64Data
-    const format = this.props.format
 
+    // src is set by paintFrame(); without one until the first frame, no broken-image icon shows
     return (
       <img
         className="screencast"
-        // no src until the first frame arrives, otherwise a broken-image icon shows
-        src={base64Data ? `data:image/${format};base64,${base64Data}` : undefined}
         alt=""
         ref={this.imageRef}
         style={canvasStyle}
@@ -97,28 +87,34 @@ class Screencast extends React.Component<any, any> {
           position,
         })
       }
-      else if (event.type === 'mousemove') {
-        const position = this.convertIntoScreenSpace(event, this.state)
-        this.props.onInspectHighlightRequested({
-          position,
-        })
-      }
     }
     else {
       this.dispatchMouseEvent(event.nativeEvent)
     }
 
     if (event.type === 'mousemove') {
-      const position = this.convertIntoScreenSpace(event, this.state)
-      this.props.onMouseMoved({
-        position,
-      })
+      this.hoverPosition = this.convertIntoScreenSpace(event, this.state)
+      if (this.hoverFrameId === null)
+        this.hoverFrameId = window.requestAnimationFrame(this.flushHover)
     }
 
     if (event.type === 'mousedown') {
       if (this.imageRef.current)
         this.imageRef.current.focus()
     }
+  }
+
+  // cursor and inspect-highlight lookups cost page round trips, so they run once per frame for the latest position
+  private flushHover() {
+    this.hoverFrameId = null
+    const position = this.hoverPosition
+    if (!position)
+      return
+    this.hoverPosition = null
+
+    if (this.props.isInspectEnabled)
+      this.props.onInspectHighlightRequested({ position })
+    this.props.onMouseMoved({ position })
   }
 
   private convertIntoScreenSpace(event: any, state: any) {

@@ -67,23 +67,6 @@ export class CDPHelper {
     return data.result as Array<object>
   }
 
-  public async getCursorForNode(nodeInfo: any) {
-    let nodeId = nodeInfo.nodeId
-    if (!nodeInfo.nodeId)
-      nodeId = this.getNodeIdFromBackendId(nodeInfo.backendNodeId)
-
-    if (!nodeId)
-      return
-
-    const computedStyleReq = await this.connection.send('CSS.getComputedStyleForNode', {
-      nodeId,
-    })
-
-    const cursorCSS = computedStyleReq.computedStyle.find((c: any) => c.name === 'cursor')
-
-    return cursorCSS.value
-  }
-
   public async getNodeIdFromBackendId(backendNodeId: any) {
     await this.connection.send('DOM.getDocument')
     const nodeIdsReq = await this.connection.send('DOM.pushNodesByBackendIdsToFrontend', {

@@ -7,8 +7,10 @@ import Loading from '../loading-bar/loading-bar'
 import Screencast from '../screencast/screencast'
 import { ErrorPage } from '../error-page/error-page'
 
-class Viewport extends React.Component<any, any> {
+// pure: frames are painted through paintFrame(), so this only renders when its props change
+class Viewport extends React.PureComponent<any, any> {
   private viewportRef: React.RefObject<HTMLDivElement>
+  private screencast: Screencast | null = null
   private debouncedResizeHandler: any
   private viewportPadding: any
   private onActionInvoked: any
@@ -108,8 +110,7 @@ class Viewport extends React.Component<any, any> {
                 <Screencast
                   height={height}
                   width={width}
-                  frame={this.props.frame}
-                  format={this.props.format}
+                  ref={c => this.screencast = c}
                   viewportMetadata={viewport}
                   isInspectEnabled={this.props.isInspectEnabled}
                   onInspectElement={this.handleInspectElement}
@@ -122,6 +123,11 @@ class Viewport extends React.Component<any, any> {
         }
       </div>
     )
+  }
+
+  // resolves immediately while no screencast is shown, e.g. on the error page
+  public paintFrame(base64Data: string, format: string) {
+    return this.screencast?.paintFrame(base64Data, format) ?? Promise.resolve()
   }
 
   public calculateViewport() {

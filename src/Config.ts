@@ -49,7 +49,7 @@ export function getConfigs(ctx: ExtensionContext): ExtensionConfiguration {
     extensionPath: ctx.extensionPath,
     columnNumber: 2,
     isDebug: false,
-    quality: getConfig('amaze-browser.quality', 100),
+    quality: getConfig('amaze-browser.quality', 80),
     everyNthFrame: getConfig('amaze-browser.everyNthFrame', 1),
     format: getConfig('amaze-browser.format', 'jpeg'),
     isVerboseMode: getConfig('amaze-browser.verbose', false),

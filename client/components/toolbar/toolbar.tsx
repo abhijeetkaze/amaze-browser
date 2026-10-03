@@ -34,7 +34,7 @@ interface IToolbarState {
   historyMenuPosition: MenuPosition | null
 }
 
-class Toolbar extends React.Component<IToolbarProps, IToolbarState> {
+class Toolbar extends React.PureComponent<IToolbarProps, IToolbarState> {
   private viewportMetadata: any
   private historyButtonRef = React.createRef<HTMLButtonElement>()
 

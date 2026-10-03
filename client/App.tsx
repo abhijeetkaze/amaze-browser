@@ -14,6 +14,7 @@ import { clearFindExpression, findExpression } from './utils/findInPage'
 import type { MenuEntry, MenuPosition } from './components/menu/menu'
 import Connection from './connection'
 import { CDPHelper } from './utils/cdpHelper'
+import { cursorAtExpression } from './utils/cursorAtPoint'
 
 interface ElementSource {
   charNumber: number
@@ -24,7 +25,6 @@ interface ElementSource {
 
 interface IState {
   format: 'jpeg' | 'png'
-  frame: object | null
   url: string
   quality: number
   errorText: string | undefined
@@ -58,11 +58,8 @@ interface IViewport {
     nodeId: string
     sourceMetadata: ElementSource | null
   } | null
-  highlightInfo: object | null
   deviceSizeRatio: number
   screenZoom: number
-  scrollOffsetX: number
-  scrollOffsetY: number
 }
 
 class App extends React.Component<any, IState> {
@@ -73,14 +70,18 @@ class App extends React.Component<any, IState> {
   private findBar: FindBar | null = null
   private lastContextMenuPosition: { x: number, y: number } | null = null
   private readonly isMac = /macintosh|mac os x/i.test(navigator.userAgent)
+  // the node under the pointer in inspect mode, compared by its stable backend id
+  private highlightedBackendNodeId: number | null = null
+  // latest pointer position waiting for a cursor lookup, at most one lookup is in flight
+  private cursorPosition: { x: number, y: number } | null = null
+  private isResolvingCursor = false
 
   constructor(props: any) {
     super(props)
     this.state = {
-      frame: null,
       format: 'jpeg',
       url: 'about:blank',
-      quality: 100,
+      quality: 80,
       everyNthFrame: 1,
       isVerboseMode: false,
       isDebug: false,
@@ -101,7 +102,6 @@ class App extends React.Component<any, IState> {
         height: null,
         width: null,
         highlightNode: null,
-        highlightInfo: null,
         emulatedDeviceId: 'Responsive',
         isLoading: false,
         isFixedSize: false,
@@ -109,8 +109,6 @@ class App extends React.Component<any, IState> {
         isResizable: false,
         loadingPercent: 0.0,
         screenZoom: 1,
-        scrollOffsetX: 0,
-        scrollOffsetY: 0,
       },
     }
 
@@ -258,14 +256,14 @@ class App extends React.Component<any, IState> {
       // TODO: Scroll the page
     })
 
-    // Initialize
+    // Initialize; DOM and Overlay are only enabled while inspecting, so Chromium
+    // doesn't track every node of the page the rest of the time.
+    // The screencast starts once the configuration arrives ('extension.appConfiguration').
     this.connection.send('Page.enable')
-    this.connection.send('DOM.enable')
-    this.connection.send('CSS.enable')
-    this.connection.send('Overlay.enable')
+    // once here and on device changes, not before every navigation
+    this.handleSetUserAgent()
 
     this.requestNavigationHistory()
-    this.startCasting()
 
     this.cdpHelper = new CDPHelper(this.connection)
 
@@ -274,25 +272,25 @@ class App extends React.Component<any, IState> {
   }
 
   private async handleScreencastFrame(result: any) {
-    const { sessionId, data, metadata } = result
-    this.connection.send('Page.screencastFrameAck', { sessionId })
+    const { sessionId, data } = result
 
-    this.requestNodeHighlighting()
+    // the first frame at a new size resizes the view; other frames don't re-render anything
+    if (this.nextViewportSize) {
+      const size = this.nextViewportSize
+      this.nextViewportSize = undefined
+      await this.updateState({
+        viewportMetadata: { ...this.state.viewportMetadata, ...size },
+      })
+    }
 
-    await this.updateState({
-      frame: {
-        base64Data: data,
-        metadata,
-      },
-      viewportMetadata: {
-        ...this.state.viewportMetadata,
-        ...this.nextViewportSize,
-        scrollOffsetX: metadata.scrollOffsetX,
-        scrollOffsetY: metadata.scrollOffsetY,
-      },
-    })
-
-    this.nextViewportSize = undefined
+    // ack only once the frame is ready to show, so Chromium sends the next one
+    // when the view can take it, instead of queueing frames that are stale on arrival
+    try {
+      await this.viewport?.paintFrame(data, this.state.format)
+    }
+    finally {
+      this.connection.send('Page.screencastFrameAck', { sessionId })
+    }
   }
 
   public componentDidUpdate() {
@@ -333,8 +331,6 @@ class App extends React.Component<any, IState> {
           viewport={this.state.viewportMetadata}
           isInspectEnabled={this.state.isInspectEnabled}
           isDeviceEmulationEnabled={this.state.isDeviceEmulationEnabled}
-          frame={this.state.frame}
-          format={this.state.format}
           url={this.state.url}
           onActionInvoked={this.onToolbarActionInvoked}
           errorText={this.state.errorText}
@@ -550,6 +546,11 @@ class App extends React.Component<any, IState> {
     )
 
     if (highlightNodeInfo) {
+      // same node as before: the page keeps the highlight on it by itself
+      if (highlightNodeInfo.backendNodeId === this.highlightedBackendNodeId)
+        return
+      this.highlightedBackendNodeId = highlightNodeInfo.backendNodeId
+
       let nodeId = highlightNodeInfo.nodeId
 
       if (!highlightNodeInfo.nodeId && highlightNodeInfo.backendNodeId) {
@@ -691,21 +692,26 @@ class App extends React.Component<any, IState> {
   }
 
   private handleToggleInspect() {
+    this.highlightedBackendNodeId = null
+
     if (this.state.isInspectEnabled) {
       // Hide browser highlight
       this.connection.send('Overlay.hideHighlight')
+      this.connection.send('Overlay.disable')
+      this.connection.send('DOM.disable')
 
       // Hide local highlight
       this.updateState({
         isInspectEnabled: false,
         viewportMetadata: {
           ...this.state.viewportMetadata,
-          highlightInfo: null,
           highlightNode: null,
         },
       })
     }
     else {
+      this.connection.send('DOM.enable')
+      this.connection.send('Overlay.enable')
       this.updateState({
         isInspectEnabled: true,
       })
@@ -713,7 +719,6 @@ class App extends React.Component<any, IState> {
   }
 
   private async handleNavigate(url: string) {
-    await this.handleSetUserAgent()
     const data: any = await this.connection.send('Page.navigate', { url })
     this.setState({ url, errorText: data.errorText })
   }
@@ -799,33 +804,43 @@ class App extends React.Component<any, IState> {
   }
 
   private async handleElementChanged(data: any) {
-    const nodeInfo: any = await this.connection.send('DOM.getNodeForLocation', {
-      x: data.params.position.x,
-      y: data.params.position.y,
-    })
+    this.cursorPosition = data.params.position
+    if (this.isResolvingCursor)
+      return
 
-    const cursor = await this.cdpHelper.getCursorForNode(nodeInfo)
-
-    this.setState({
-      viewportMetadata: {
-        ...this.state.viewportMetadata,
-        cursor,
-      },
-    })
+    this.isResolvingCursor = true
+    try {
+      // positions that arrive during a lookup collapse into one more lookup for the latest
+      while (this.cursorPosition) {
+        const { x, y } = this.cursorPosition
+        this.cursorPosition = null
+        const response: any = await this.connection.send('Runtime.evaluate', {
+          expression: cursorAtExpression(x, y),
+          returnByValue: true,
+          silent: true,
+        })
+        const cursor = response?.result?.value ?? null
+        if (cursor !== this.state.viewportMetadata.cursor) {
+          this.updateState({
+            viewportMetadata: { ...this.state.viewportMetadata, cursor },
+          })
+        }
+      }
+    }
+    catch {
+      // e.g. the page navigated away mid-lookup; the next move tries again
+    }
+    finally {
+      this.isResolvingCursor = false
+    }
   }
 
-  private async requestNodeHighlighting() {
+  private requestNodeHighlighting() {
     if (this.state.viewportMetadata.highlightNode) {
       const nodeId = this.state.viewportMetadata.highlightNode.nodeId
-      const highlightBoxModel: any = await this.connection.send(
-        'DOM.getBoxModel',
-        {
-          nodeId,
-        },
-      )
 
       // Trigger hightlight in regular browser.
-      await this.connection.send('Overlay.highlightNode', {
+      this.connection.send('Overlay.highlightNode', {
         nodeId,
         highlightConfig: {
           showInfo: true,
@@ -838,15 +853,6 @@ class App extends React.Component<any, IState> {
           marginColor: { r: 246, g: 178, b: 107, a: 0.66 },
         },
       })
-
-      if (highlightBoxModel && highlightBoxModel.model) {
-        this.setState({
-          viewportMetadata: {
-            ...this.state.viewportMetadata,
-            highlightInfo: highlightBoxModel.model,
-          },
-        })
-      }
     }
   }
 }
