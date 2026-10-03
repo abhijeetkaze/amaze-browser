@@ -1,0 +1,48 @@
+name: Release rust-impl
+
+# Every push to rust-impl builds all platform VSIXes (with the Rust engine) and attaches them
+# to a GitHub pre-release. Nothing is published to Open VSX or any marketplace.
+on:
+  push:
+    branches: [rust-impl]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: rust-impl-release
+  cancel-in-progress: true
+
+jobs:
+  build:
+    uses: ./.github/workflows/build.yml
+
+  release:
+    needs: build
+    if: github.ref == 'refs/heads/rust-impl'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: vsix-*
+          path: bin
+          merge-multiple: true
+
+      # a pre-release, never "Latest": the main releases stay what users get
+      - name: Release
+        run: |
+          version=$(node -p "require('./package.json').version")
+          tag="rust-v$version-$GITHUB_RUN_NUMBER"
+          cat > notes.md <<EOF
+          Experimental build of the \`rust-impl\` branch at $GITHUB_SHA, not published to any marketplace.
+
+          Install the VSIX for your platform (Extensions view → … → Install from VSIX), then set
+          \`"amaze-browser.engine": "rust"\`. The \`universal\` one has no Rust engine.
+          EOF
+          gh release create "$tag" bin/*.vsix --title "$tag (rust-impl)" --notes-file notes.md \
+            --target "$GITHUB_SHA" --prerelease --latest=false
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

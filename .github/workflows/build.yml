@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  # rust-impl-release.yml reuses the build; the release job below only runs on main
+  workflow_call:
 
 permissions:
   contents: write
