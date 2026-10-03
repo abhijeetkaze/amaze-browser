@@ -501,7 +501,7 @@ class App extends React.Component<any, IState> {
       return
     }
     // a popup the page opens without a click can be blocked: then it opens here instead
-    if (!window.open(`/?newTab&url=${encodeURIComponent(url)}`, '_blank'))
+    if (!window.open(`./?newTab&url=${encodeURIComponent(url)}`, '_blank'))
       this.handleNavigate(url)
   }
 
@@ -812,7 +812,7 @@ class App extends React.Component<any, IState> {
         break
       case 'newTab':
         if (this.connection.isRemote)
-          window.open('/?newTab', '_blank')
+          window.open('./?newTab', '_blank')
         else
           this.connection.send('extension.newTab')
         break

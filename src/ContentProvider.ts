@@ -13,7 +13,8 @@ export class ContentProvider {
 
     return indexHTML.replace(
       /(src|href)="(.*?)"/g,
-      (_, tag, url) => `${tag}="${webview.asWebviewUri(Uri.file(join(root, url.slice(1))))}"`,
+      // the build links assets relative to the page (./assets/...)
+      (_, tag, url) => `${tag}="${webview.asWebviewUri(Uri.file(join(root, url.replace(/^\.?\//, ''))))}"`,
     )
   }
 }
