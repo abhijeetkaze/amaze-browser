@@ -361,6 +361,7 @@ class App extends React.Component<any, IState> {
                 isInspectEnabled={this.state.isInspectEnabled}
                 isDeviceEmulationEnabled={this.state.isDeviceEmulationEnabled}
                 visitedPages={this.state.visitedPages}
+                isRemote={this.connection.isRemote}
                 overlay={this.state.isFindOpen && (
                   <FindBar
                     ref={c => this.findBar = c}
@@ -815,6 +816,18 @@ class App extends React.Component<any, IState> {
           window.open('./?newTab', '_blank')
         else
           this.connection.send('extension.newTab')
+        break
+      case 'openDevTools':
+        this.openDevTools()
+        break
+      case 'moveDevTools':
+        this.connection.send('extension.moveDevTools')
+        break
+      case 'openExternal':
+        this.connection.send('extension.openExternal', { url: this.state.url })
+        break
+      case 'startServer':
+        this.connection.send('extension.startServer')
         break
       case 'clearBrowsingData':
         this.connection.send('extension.clearBrowsingData')

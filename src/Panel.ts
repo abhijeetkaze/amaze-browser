@@ -127,6 +127,13 @@ export class Panel extends EventEmitter2 {
         if (msg.type === 'extension.openDevTools')
           this.createDebugPanel().then(panel => panel?.show())
 
+        // from the toolbar's More menu
+        if (msg.type === 'extension.moveDevTools')
+          commands.executeCommand('amaze-browser.moveDevTools')
+
+        if (msg.type === 'extension.startServer')
+          commands.executeCommand('amaze-browser.startServer')
+
         if (msg.type === 'extension.windowDialogRequested') {
           const { message, type } = msg.params
           if (type == 'alert') {

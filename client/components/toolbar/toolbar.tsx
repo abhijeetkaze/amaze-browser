@@ -6,7 +6,7 @@ import DeviceSettings from '../device-settings/device-settings'
 import Menu from '../menu/menu'
 import type { MenuEntry, MenuPosition } from '../menu/menu'
 import type { HistoryEntry } from '../../../src/HistoryEntry'
-import { ArrowLeftIcon, ArrowRightIcon, DeviceIcon, HistoryIcon, PlusIcon, ReloadIcon, StopIcon, ZoomInIcon, ZoomOutIcon } from '../icons/icons'
+import { ArrowLeftIcon, ArrowRightIcon, DeviceIcon, HistoryIcon, MoreVerticalIcon, PlusIcon, ReloadIcon, StopIcon, ZoomInIcon, ZoomOutIcon } from '../icons/icons'
 import { MAX_ZOOM, MIN_ZOOM } from '../../utils/pageZoom'
 
 function hostname(url: string) {
@@ -26,6 +26,8 @@ interface IToolbarProps {
   url: string
   viewport: any
   visitedPages: HistoryEntry[]
+  // a tab of the user's browser served by the HTTP server: no VS Code-only actions
+  isRemote?: boolean
   // floating panel shown under the toolbar, e.g. the find bar
   overlay?: React.ReactNode
   onActionInvoked: (action: string, data?: object) => Promise<any>
@@ -33,15 +35,17 @@ interface IToolbarProps {
 
 interface IToolbarState {
   historyMenuPosition: MenuPosition | null
+  moreMenuPosition: MenuPosition | null
 }
 
 class Toolbar extends React.PureComponent<IToolbarProps, IToolbarState> {
   private viewportMetadata: any
   private historyButtonRef = React.createRef<HTMLButtonElement>()
+  private moreButtonRef = React.createRef<HTMLButtonElement>()
 
   constructor(props: any) {
     super(props)
-    this.state = { historyMenuPosition: null }
+    this.state = { historyMenuPosition: null, moreMenuPosition: null }
 
     this.handleBack = this.handleBack.bind(this)
     this.handleForward = this.handleForward.bind(this)
@@ -53,6 +57,8 @@ class Toolbar extends React.PureComponent<IToolbarProps, IToolbarState> {
     this.handleViewportSizeChange = this.handleViewportSizeChange.bind(this)
     this.toggleHistoryMenu = this.toggleHistoryMenu.bind(this)
     this.closeHistoryMenu = this.closeHistoryMenu.bind(this)
+    this.toggleMoreMenu = this.toggleMoreMenu.bind(this)
+    this.closeMoreMenu = this.closeMoreMenu.bind(this)
   }
 
   public render() {
@@ -157,6 +163,17 @@ class Toolbar extends React.PureComponent<IToolbarProps, IToolbarState> {
             >
               <PlusIcon />
             </button>
+            <button
+              className={`toolbar-button ${this.state.moreMenuPosition ? 'active' : ''}`}
+              title="More"
+              aria-label="More"
+              aria-haspopup="menu"
+              aria-expanded={!!this.state.moreMenuPosition}
+              ref={this.moreButtonRef}
+              onClick={this.toggleMoreMenu}
+            >
+              <MoreVerticalIcon />
+            </button>
           </div>
         </div>
         <Menu
@@ -164,6 +181,12 @@ class Toolbar extends React.PureComponent<IToolbarProps, IToolbarState> {
           items={this.getHistoryMenuItems()}
           onClose={this.closeHistoryMenu}
           ignoreClicksOn={this.historyButtonRef}
+        />
+        <Menu
+          position={this.state.moreMenuPosition}
+          items={this.getMoreMenuItems()}
+          onClose={this.closeMoreMenu}
+          ignoreClicksOn={this.moreButtonRef}
         />
         {this.props.overlay}
         <DeviceSettings
@@ -188,6 +211,34 @@ class Toolbar extends React.PureComponent<IToolbarProps, IToolbarState> {
 
   private closeHistoryMenu() {
     this.setState({ historyMenuPosition: null })
+  }
+
+  private toggleMoreMenu() {
+    if (this.state.moreMenuPosition) {
+      this.closeMoreMenu()
+      return
+    }
+    const rect = this.moreButtonRef.current!.getBoundingClientRect()
+    this.setState({ moreMenuPosition: { x: rect.right, y: rect.bottom + 4 } })
+  }
+
+  private closeMoreMenu() {
+    this.setState({ moreMenuPosition: null })
+  }
+
+  private getMoreMenuItems(): MenuEntry[] {
+    const act = (action: string) => () => this.props.onActionInvoked(action)
+    const items: MenuEntry[] = [{ label: 'Open DevTools', action: act('openDevTools') }]
+    // a browser tab opens DevTools as a tab of its own, and is already in the system browser
+    if (!this.props.isRemote) {
+      items.push(
+        { label: 'Move DevTools...', action: act('moveDevTools') },
+        null,
+        { label: 'Open in System Browser', action: act('openExternal') },
+        { label: 'Start HTTP Server', action: act('startServer') },
+      )
+    }
+    return items
   }
 
   private getHistoryMenuItems(): MenuEntry[] {

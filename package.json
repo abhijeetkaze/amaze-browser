@@ -99,13 +99,13 @@
       {
         "category": "Amaze Browser",
         "command": "amaze-browser.controls.external",
-        "title": "Open page with system browser",
+        "title": "Open in System Browser",
         "icon": "$(link-external)"
       },
       {
         "category": "Amaze Browser",
         "command": "amaze-browser.controls.debug",
-        "title": "Open debug page",
+        "title": "Open DevTools",
         "icon": "$(bug)"
       },
       {
@@ -357,11 +357,6 @@
         {
           "when": "resourceScheme == webview-panel && amaze-browser-active",
           "command": "amaze-browser.controls.external",
-          "group": "navigation"
-        },
-        {
-          "when": "resourceScheme == webview-panel && amaze-browser-active && !amaze-browser-debug-active",
-          "command": "amaze-browser.controls.debug",
           "group": "navigation"
         },
         {

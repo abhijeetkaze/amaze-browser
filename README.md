@@ -66,7 +66,9 @@ codium --install-extension abhijeetkaze.amaze-browser
 
 To preview the HTML file you're editing, run **Amaze Browser: Open Active File in Preview**.
 
-### DevTools position
+### Browser menu and DevTools
+
+The **⋮** button at the end of the address bar opens the browser menu: **Open DevTools**, **Move DevTools...**, **Open in System Browser** and **Start HTTP Server**.
 
 DevTools opens next to the page by default. On a smaller screen, click the layout button in the DevTools tab's title bar (or run **Amaze Browser: Move DevTools...**) and choose:
 
@@ -109,8 +111,8 @@ When a page asks you to choose a file to upload, VS Code's file picker opens in 
 | `Amaze Browser: Show Support Notification` | Show the option to buy me a coffee |
 | `Amaze Browser: Open Active File in Preview` | Open the current file, reloading on save |
 | `Amaze Browser: Refresh Page` | Reload the current page |
-| `Amaze Browser: Open page with system browser` | Open the current page in your default browser |
-| `Amaze Browser: Open debug page` | Open DevTools for the current page |
+| `Amaze Browser: Open in System Browser` | Open the current page in your default browser |
+| `Amaze Browser: Open DevTools` | Open DevTools for the current page |
 
 ### Debugging with VS Code
 
