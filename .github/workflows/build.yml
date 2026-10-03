@@ -2,14 +2,30 @@ name: Build VSIX
 
 on:
   push:
+    branches: [main]
   workflow_dispatch:
+  # rust-impl-release.yml reuses the build; the release job below only runs on main
+  workflow_call:
 
 permissions:
   contents: write
 
 jobs:
+  # one VSIX per platform, each with its own Rust engine binary (static musl on Linux, so it
+  # runs whatever the glibc version), plus a universal one without the engine that VS Code
+  # installs on other platforms (it uses the TS engine)
   build:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, vsce: linux-x64, rust: x86_64-unknown-linux-musl }
+          - { os: ubuntu-24.04-arm, vsce: linux-arm64, rust: aarch64-unknown-linux-musl }
+          - { os: macos-latest, vsce: darwin-arm64, rust: aarch64-apple-darwin }
+          - { os: macos-latest, vsce: darwin-x64, rust: x86_64-apple-darwin }
+          - { os: windows-latest, vsce: win32-x64, rust: x86_64-pc-windows-msvc }
+          - { os: ubuntu-latest, vsce: universal }
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
@@ -24,21 +40,59 @@ jobs:
       - name: Install
         run: npm ci
 
+      - name: Install Rust
+        if: matrix.rust
+        run: rustup toolchain install stable --profile minimal --target ${{ matrix.rust }} && rustup default stable
+
+      - uses: Swatinem/rust-cache@v2
+        if: matrix.rust
+        with:
+          workspaces: engine
+          key: ${{ matrix.rust }}
+
       - name: Build
+        if: matrix.rust
         run: npm run build
+        env:
+          RUST_TARGET: ${{ matrix.rust }}
+
+      - name: Build (without engine)
+        if: ${{ !matrix.rust }}
+        run: npx rimraf dist && npx vite build && pnpm run build:ts --minify
 
       - name: Package
+        if: matrix.rust
+        run: npm run pack -- --target ${{ matrix.vsce }}
+
+      - name: Package (universal)
+        if: ${{ !matrix.rust }}
         run: npm run pack
 
       - uses: actions/upload-artifact@v4
         with:
-          name: amaze-browser-vsix
+          name: vsix-${{ matrix.vsce }}
           path: bin/*.vsix
           if-no-files-found: error
 
+  release:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: vsix-*
+          path: bin
+          merge-multiple: true
+
       # creates a GitHub release once per version in package.json
       - name: Release
-        if: github.ref == 'refs/heads/main'
         run: |
           version=$(node -p "require('./package.json').version")
           if gh release view "v$version" >/dev/null 2>&1; then
@@ -50,14 +104,15 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # publishes to open-vsx.org; versions already published are skipped
+      # publishes every platform to open-vsx.org; versions already published are skipped
       - name: Publish to Open VSX
-        if: github.ref == 'refs/heads/main'
         # --skip-duplicate misses a version Open VSX is still processing
         run: |
-          if ! npx ovsx publish --packagePath bin/*.vsix --pat "$OVSX_PAT" --skip-duplicate 2>&1 | tee publish.log; then
-            grep -q 'is already published' publish.log || exit 1
-          fi
+          for vsix in bin/*.vsix; do
+            if ! npx ovsx publish --packagePath "$vsix" --pat "$OVSX_PAT" --skip-duplicate 2>&1 | tee publish.log; then
+              grep -q 'is already published' publish.log || exit 1
+            fi
+          done
         shell: bash
         env:
           OVSX_PAT: ${{ secrets.OVSX_PAT }}

@@ -13,7 +13,9 @@ import type { FindResult } from './utils/findInPage'
 import { clearFindExpression, findExpression } from './utils/findInPage'
 import type { MenuEntry, MenuPosition } from './components/menu/menu'
 import Connection from './connection'
+import type { ScreencastFrame } from './components/screencast/screencast'
 import { CDPHelper } from './utils/cdpHelper'
+import EngineStream from './engineStream'
 import { cursorAtExpression } from './utils/cursorAtPoint'
 import { nextZoomLevel, previousZoomLevel } from './utils/pageZoom'
 
@@ -26,6 +28,7 @@ interface ElementSource {
 
 interface IState {
   format: 'jpeg' | 'png'
+  perfHud: boolean
   url: string
   quality: number
   errorText: string | undefined
@@ -74,6 +77,8 @@ class App extends React.Component<any, IState> {
   private findBar: FindBar | null = null
   private lastContextMenuPosition: { x: number, y: number } | null = null
   private readonly isMac = /macintosh|mac os x/i.test(navigator.userAgent)
+  private isPanelVisible = true
+  private engineStream: EngineStream | undefined
   // the node under the pointer in inspect mode, compared by its stable backend id
   private highlightedBackendNodeId: number | null = null
   // latest pointer position waiting for a cursor lookup, at most one lookup is in flight
@@ -83,6 +88,7 @@ class App extends React.Component<any, IState> {
   constructor(props: any) {
     super(props)
     this.state = {
+      perfHud: false,
       format: 'jpeg',
       url: 'about:blank',
       quality: 80,
@@ -225,9 +231,15 @@ class App extends React.Component<any, IState> {
       }, 500)
     })
 
-    this.connection.on('Page.screencastFrame', (result: any) => {
-      this.handleScreencastFrame(result)
+    this.connection.on('extension.screencastFrame', (frame: ScreencastFrame) => {
+      this.handleScreencastFrame(frame)
     })
+
+    // stop streaming while the panel is hidden, nobody sees those frames
+    this.connection.on('extension.visibility', ({ visible }: { visible: boolean }) => this.setPanelVisible(visible))
+    // a browser tab knows by itself when it's in the background
+    if (this.connection.isRemote)
+      document.addEventListener('visibilitychange', () => this.setPanelVisible(!document.hidden))
 
     this.connection.on('Page.windowOpen', (result: any) => {
       this.openInNewTab(result.url)
@@ -259,8 +271,24 @@ class App extends React.Component<any, IState> {
         if (!payload)
           return
 
+        // frames come straight from the Rust engine when it runs; the extension host streams them otherwise
+        if (payload.engineEndpoint && !this.engineStream) {
+          const stream: EngineStream = new EngineStream(
+            payload.engineEndpoint,
+            frame => this.handleScreencastFrame(frame, () => stream.frameDrawn()),
+            () => {
+              this.engineStream = undefined
+              this.startCasting()
+            },
+          )
+          this.engineStream = stream
+          // a screencast started through the extension host before this would make Chromium encode every frame twice
+          this.connection.send('Page.stopScreencast')
+        }
+
+        // the state isn't updated yet, cast with the received format and quality
         this.stopCasting()
-        this.startCasting()
+        this.startCasting(payload)
 
         if (payload.startUrl)
           this.handleNavigate(payload.startUrl)
@@ -295,25 +323,18 @@ class App extends React.Component<any, IState> {
     this.connection.send('extension.ready')
   }
 
-  private async handleScreencastFrame(result: any) {
-    const { sessionId, data } = result
+  // the sender (extension host or engine) acks Chromium and sends the next frame once this one is decoded
+  private handleScreencastFrame(frame: ScreencastFrame, frameDrawn = () => this.connection.notify('extension.frameDrawn')) {
+    if (!this.viewport?.drawFrame(frame, frameDrawn))
+      frameDrawn()
 
     // the first frame at a new size resizes the view; other frames don't re-render anything
     if (this.nextViewportSize) {
       const size = this.nextViewportSize
       this.nextViewportSize = undefined
-      await this.updateState({
+      this.updateState({
         viewportMetadata: { ...this.state.viewportMetadata, ...size },
       })
-    }
-
-    // ack only once the frame is ready to show, so Chromium sends the next one
-    // when the view can take it, instead of queueing frames that are stale on arrival
-    try {
-      await this.viewport?.paintFrame(data, this.state.format)
-    }
-    finally {
-      this.connection.send('Page.screencastFrameAck', { sessionId })
     }
   }
 
@@ -355,6 +376,7 @@ class App extends React.Component<any, IState> {
           viewport={this.state.viewportMetadata}
           isInspectEnabled={this.state.isInspectEnabled}
           isDeviceEmulationEnabled={this.state.isDeviceEmulationEnabled}
+          perfHud={this.state.perfHud}
           url={this.state.url}
           onActionInvoked={this.onToolbarActionInvoked}
           errorText={this.state.errorText}
@@ -382,7 +404,7 @@ class App extends React.Component<any, IState> {
     this.connection.send('Runtime.evaluate', { expression: clearFindExpression() })
     this.updateState({ isFindOpen: false, findResult: null })
     // give keyboard focus back to the page
-    document.querySelector<HTMLElement>('img.screencast')?.focus()
+    document.querySelector<HTMLElement>('.screencast')?.focus()
   }
 
   private closePageContextMenu() {
@@ -511,22 +533,43 @@ class App extends React.Component<any, IState> {
   }
   /* eslint-enable no-alert */
 
-  public stopCasting() {
-    this.connection.send('Page.stopScreencast')
+  private setPanelVisible(visible: boolean) {
+    if (visible === this.isPanelVisible)
+      return
+    this.isPanelVisible = visible
+    if (visible)
+      this.startCasting()
+    else
+      this.stopCasting()
   }
 
-  public startCasting(retries = 50) {
+  public stopCasting() {
+    if (this.engineStream)
+      this.engineStream.stop()
+    else
+      this.connection.send('Page.stopScreencast')
+  }
+
+  public startCasting(config: Pick<IState, 'quality' | 'format' | 'everyNthFrame'> = this.state, retries = 50) {
+    if (!this.isPanelVisible)
+      return
+
     const params = {
-      quality: this.state.quality,
-      format: this.state.format,
-      everyNthFrame: this.state.everyNthFrame,
+      quality: config.quality,
+      format: config.format,
+      everyNthFrame: config.everyNthFrame,
     }
 
+    // the engine retries by itself
+    if (this.engineStream) {
+      this.engineStream.start(params)
+      return
+    }
     // Chromium refuses while the page is mid-navigation ("Not attached to an active page"),
     // e.g. when a resize restarts the screencast right as a page starts loading
     this.connection.send('Page.startScreencast', params).catch(() => {
       if (retries > 0)
-        setTimeout(() => this.startCasting(retries - 1), 200)
+        setTimeout(() => this.startCasting(config, retries - 1), 200)
     })
   }
 

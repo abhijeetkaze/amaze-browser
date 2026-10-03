@@ -5,6 +5,7 @@ import { Resizable } from 're-resizable'
 import debounce from 'lodash/debounce'
 import Loading from '../loading-bar/loading-bar'
 import Screencast from '../screencast/screencast'
+import type { ScreencastFrame } from '../screencast/screencast'
 import { ErrorPage } from '../error-page/error-page'
 
 // pure: frames are painted through paintFrame(), so this only renders when its props change
@@ -111,6 +112,7 @@ class Viewport extends React.PureComponent<any, any> {
                   height={height}
                   width={width}
                   ref={c => this.screencast = c}
+                  perfHud={this.props.perfHud}
                   viewportMetadata={viewport}
                   isInspectEnabled={this.props.isInspectEnabled}
                   onInspectElement={this.handleInspectElement}
@@ -125,9 +127,12 @@ class Viewport extends React.PureComponent<any, any> {
     )
   }
 
-  // resolves immediately while no screencast is shown, e.g. on the error page
-  public paintFrame(base64Data: string, format: string) {
-    return this.screencast?.paintFrame(base64Data, format) ?? Promise.resolve()
+  // returns false when there is nothing to draw on (e.g. the error page is showing)
+  public drawFrame(frame: ScreencastFrame, onDecoded: () => void) {
+    if (!this.screencast)
+      return false
+    this.screencast.drawFrame(frame, onDecoded).catch(() => {})
+    return true
   }
 
   public calculateViewport() {

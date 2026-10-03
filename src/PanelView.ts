@@ -1,3 +1,4 @@
+import { Buffer } from 'buffer'
 import type { Event, WebviewPanel } from 'vscode'
 import { EventEmitter, Uri } from 'vscode'
 import type { WebSocket } from 'ws'
@@ -12,6 +13,8 @@ export interface PanelView {
   readonly onDidReceiveMessage: Event<any>
   readonly onDidDispose: Event<void>
   readonly onDidChangeActive: Event<boolean>
+  // the webview is hidden, e.g. behind another editor tab; a browser tab watches its own visibility
+  readonly onDidChangeVisible: Event<boolean>
   postMessage(message: unknown): void
   setTitle(title: string): void
   setIcon(url: string): void
@@ -24,12 +27,15 @@ export class WebviewPanelView implements PanelView {
   readonly onDidReceiveMessage: Event<any>
   readonly onDidDispose: Event<void>
   readonly onDidChangeActive: Event<boolean>
+  readonly onDidChangeVisible: Event<boolean>
 
   constructor(private readonly panel: WebviewPanel) {
     this.onDidReceiveMessage = panel.webview.onDidReceiveMessage
     this.onDidDispose = panel.onDidDispose
     this.onDidChangeActive = (listener, thisArgs?, disposables?) =>
       panel.onDidChangeViewState(() => listener.call(thisArgs, panel.active), null, disposables)
+    this.onDidChangeVisible = (listener, thisArgs?, disposables?) =>
+      panel.onDidChangeViewState(() => listener.call(thisArgs, panel.visible), null, disposables)
   }
 
   postMessage(message: unknown) {
@@ -69,6 +75,7 @@ export class SocketView implements PanelView {
   readonly onDidDispose = this.disposed.event
   // VS Code's "current panel" (refresh, DevTools commands...) only means webviews
   readonly onDidChangeActive: Event<boolean> = () => ({ dispose() {} })
+  readonly onDidChangeVisible: Event<boolean> = () => ({ dispose() {} })
   private socket: WebSocket | undefined
   private closeTimer: ReturnType<typeof setTimeout> | undefined
   private isDisposed = false
@@ -117,9 +124,13 @@ export class SocketView implements PanelView {
     })
   }
 
-  postMessage(message: unknown) {
+  postMessage(message: any) {
     // while the tab reconnects, messages (mostly frames) are dropped; it asks for the state again
-    if (this.socket?.readyState === this.socket?.OPEN)
+    if (this.socket?.readyState !== this.socket?.OPEN)
+      return
+    if (message?.method === 'extension.screencastFrame')
+      this.socket!.send(framePacket(message.result))
+    else
       this.socket!.send(JSON.stringify(message))
   }
 
@@ -138,4 +149,12 @@ export class SocketView implements PanelView {
     this.messages.dispose()
     this.disposed.dispose()
   }
+}
+
+// A frame as binary, in the Rust engine's packet layout (engine/src/frame.rs): JSON would turn the image into a huge array
+function framePacket({ data, metadata, droppedFrames }: { data: ArrayBuffer, metadata: { timestamp?: number }, droppedFrames: number }) {
+  const header = Buffer.alloc(36)
+  header.writeDoubleLE(metadata.timestamp ?? 0, 0)
+  header.writeUInt32LE(droppedFrames >>> 0, 32)
+  return Buffer.concat([header, Buffer.from(data)])
 }

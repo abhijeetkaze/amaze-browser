@@ -3,86 +3,148 @@ import './screencast.css'
 
 // This implementation is heavily inspired by https://cs.chromium.org/chromium/src/third_party/blink/renderer/devtools/front_end/screencast/ScreencastView.js
 
+export interface ScreencastFrame {
+  data: ArrayBuffer | Uint8Array<ArrayBuffer>
+  metadata: { timestamp?: number }
+  droppedFrames: number
+}
+
 class Screencast extends React.Component<any, any> {
-  private imageRef: React.RefObject<HTMLImageElement>
+  private canvasRef: React.RefObject<HTMLCanvasElement>
+  private hudRef: React.RefObject<HTMLDivElement>
+  // decoded frame waiting for the next animation frame; a newer one replaces it
+  private nextBitmap: ImageBitmap | null = null
+  private nextTimestamp: number | undefined
+  private drawRequest: number | null = null
+  private hudTimer: number | undefined
+  private stats = { drawn: 0, skipped: 0, latency: 0, hostDropped: 0, lastHostDropped: 0 }
   // latest pointer position, resolved at most once per animation frame
   private hoverPosition: { x: number, y: number } | null = null
   private hoverFrameId: number | null = null
 
   constructor(props: any) {
     super(props)
-    this.imageRef = React.createRef()
+    this.canvasRef = React.createRef()
+    this.hudRef = React.createRef()
 
     this.handleMouseEvent = this.handleMouseEvent.bind(this)
     this.handleKeyEvent = this.handleKeyEvent.bind(this)
+    this.draw = this.draw.bind(this)
+    this.updateHud = this.updateHud.bind(this)
     this.flushHover = this.flushHover.bind(this)
+  }
 
-    this.state = {
-      imageZoom: 1,
-      screenOffsetTop: 0,
-    }
+  public componentDidMount() {
+    this.hudTimer = window.setInterval(this.updateHud, 1000)
   }
 
   public componentWillUnmount() {
+    window.clearInterval(this.hudTimer)
     if (this.hoverFrameId !== null)
       window.cancelAnimationFrame(this.hoverFrameId)
+    if (this.drawRequest)
+      window.cancelAnimationFrame(this.drawRequest)
+    this.nextBitmap?.close()
   }
 
-  /**
-   * Shows a frame without re-rendering; resolves once it is decoded and ready to
-   * paint, so the caller can ack it then and Chromium never runs ahead of the view.
-   */
-  public async paintFrame(base64Data: string, format: string) {
-    const image = this.imageRef.current
-    if (!image)
-      return
-    // the previous frame stays on screen until this one is decoded
-    image.src = `data:image/${format};base64,${base64Data}`
+  // Frames bypass React state: decoding happens off the main thread and the canvas is
+  // painted once per animation frame with the newest bitmap
+  public async drawFrame(frame: ScreencastFrame, onDecoded: () => void) {
+    let bitmap: ImageBitmap
     try {
-      await image.decode()
+      // the image type is sniffed from the bytes, so png and jpeg both work
+      bitmap = await createImageBitmap(new Blob([frame.data]))
     }
-    catch {
-      // superseded by a newer frame, or not decodable
+    finally {
+      onDecoded()
     }
+
+    if (this.nextBitmap) {
+      this.nextBitmap.close()
+      this.stats.skipped++
+    }
+    this.nextBitmap = bitmap
+    this.nextTimestamp = frame.metadata.timestamp
+    this.stats.hostDropped = frame.droppedFrames
+    if (!this.drawRequest)
+      this.drawRequest = window.requestAnimationFrame(this.draw)
+  }
+
+  private draw() {
+    this.drawRequest = null
+    const bitmap = this.nextBitmap
+    const canvas = this.canvasRef.current
+    this.nextBitmap = null
+    if (!bitmap)
+      return
+    if (canvas) {
+      if (canvas.width !== bitmap.width || canvas.height !== bitmap.height) {
+        canvas.width = bitmap.width
+        canvas.height = bitmap.height
+      }
+      canvas.getContext('2d')?.drawImage(bitmap, 0, 0)
+      canvas.classList.add('has-frame')
+      this.stats.drawn++
+      if (this.nextTimestamp)
+        this.stats.latency += Date.now() - this.nextTimestamp * 1000
+    }
+    bitmap.close()
+  }
+
+  private updateHud() {
+    const hud = this.hudRef.current
+    const { drawn, skipped, latency, hostDropped, lastHostDropped } = this.stats
+    if (hud) {
+      const heap = (performance as any).memory?.usedJSHeapSize
+      hud.textContent = [
+        `${drawn} fps`,
+        `latency ${drawn ? Math.round(latency / drawn) : '-'} ms`,
+        `dropped ${hostDropped - lastHostDropped + skipped}`,
+        heap ? `heap ${Math.round(heap / 1048576)} MB` : '',
+      ].filter(Boolean).join(' · ')
+    }
+    this.stats = { drawn: 0, skipped: 0, latency: 0, hostDropped, lastHostDropped: hostDropped }
   }
 
   public render() {
     const canvasStyle = {
       cursor: this.props.viewportMetadata?.cursor || 'auto',
+      // only the CSS size: setting the width attribute would clear the canvas
+      width: this.props.width,
     }
 
-    // src is set by paintFrame(); without one until the first frame, no broken-image icon shows
     return (
-      <img
-        className="screencast"
-        alt=""
-        ref={this.imageRef}
-        style={canvasStyle}
-        width={this.props.width}
-        draggable="false"
-        onMouseDown={this.handleMouseEvent}
-        onMouseUp={this.handleMouseEvent}
-        onMouseMove={this.handleMouseEvent}
-        onClick={this.handleMouseEvent}
-        onWheel={this.handleMouseEvent}
-        onKeyDown={this.handleKeyEvent}
-        onKeyUp={this.handleKeyEvent}
-        onKeyPress={this.handleKeyEvent}
-        onContextMenu={this.handleContextMenu}
-        tabIndex={0}
-      />
+      <>
+        <canvas
+          className="screencast"
+          ref={this.canvasRef}
+          style={canvasStyle}
+          draggable="false"
+          onMouseDown={this.handleMouseEvent}
+          onMouseUp={this.handleMouseEvent}
+          onMouseMove={this.handleMouseEvent}
+          onClick={this.handleMouseEvent}
+          onWheel={this.handleMouseEvent}
+          onKeyDown={this.handleKeyEvent}
+          onKeyUp={this.handleKeyEvent}
+          onKeyPress={this.handleKeyEvent}
+          onContextMenu={this.handleContextMenu}
+          tabIndex={0}
+        />
+        {this.props.perfHud && <div className="screencast-hud" ref={this.hudRef} />}
+      </>
     )
   }
 
-  private handleContextMenu(event: React.MouseEvent<HTMLImageElement>) {
+  private handleContextMenu(event: React.MouseEvent<HTMLCanvasElement>) {
     event.preventDefault()
   }
 
-  private handleMouseEvent(event: React.MouseEvent<HTMLImageElement>) {
+  private handleMouseEvent(event: React.MouseEvent<HTMLCanvasElement>) {
     event.stopPropagation()
     if (this.props.isInspectEnabled) {
       if (event.type === 'click') {
-        const position = this.convertIntoScreenSpace(event, this.state)
+        const position = this.convertIntoScreenSpace(event)
         this.props.onInspectElement({
           position,
         })
@@ -93,14 +155,14 @@ class Screencast extends React.Component<any, any> {
     }
 
     if (event.type === 'mousemove') {
-      this.hoverPosition = this.convertIntoScreenSpace(event, this.state)
+      this.hoverPosition = this.convertIntoScreenSpace(event)
       if (this.hoverFrameId === null)
         this.hoverFrameId = window.requestAnimationFrame(this.flushHover)
     }
 
     if (event.type === 'mousedown') {
-      if (this.imageRef.current)
-        this.imageRef.current.focus()
+      if (this.canvasRef.current)
+        this.canvasRef.current.focus()
     }
   }
 
@@ -123,7 +185,7 @@ class Screencast extends React.Component<any, any> {
     return screenZoom * pageZoom
   }
 
-  private convertIntoScreenSpace(event: any, state: any) {
+  private convertIntoScreenSpace(event: any) {
     const scale = this.pixelScale
 
     return {
@@ -132,7 +194,7 @@ class Screencast extends React.Component<any, any> {
     }
   }
 
-  private handleKeyEvent(event: React.KeyboardEvent<HTMLImageElement>) {
+  private handleKeyEvent(event: React.KeyboardEvent<HTMLCanvasElement>) {
     // Prevents events from penetrating into toolbar input
     event.stopPropagation()
     this.emitKeyEvent(event.nativeEvent)
@@ -142,8 +204,8 @@ class Screencast extends React.Component<any, any> {
     if (event.key === 'Tab' || ((event.ctrlKey || event.metaKey) && event.code === 'KeyA'))
       event.preventDefault()
 
-    if (this.imageRef.current)
-      this.imageRef.current.focus()
+    if (this.canvasRef.current)
+      this.canvasRef.current.focus()
   }
 
   private modifiersForEvent(event: any) {

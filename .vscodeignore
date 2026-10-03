@@ -16,4 +16,6 @@ vite.config.ts
 resources/*.svg
 bin/**
 bench/**
+docs/**
 engine/**
+scripts/**

@@ -75,10 +75,18 @@ export class Panel extends EventEmitter2 {
     this.view = typeof target === 'object' ? target : this.createWebview(target)
     this.view.onDidDispose(() => this.dispose(), null, this.disposables)
     this.view.onDidChangeActive(active => this.emit(active ? 'focus' : 'blur'), null, this.disposables)
+    // a hidden panel keeps its webview alive: tell it to stop the screencast until it's shown again
+    this.view.onDidChangeVisible(visible => this.view?.postMessage({ method: 'extension.visibility', result: { visible } }), null, this.disposables)
     this.view.onDidReceiveMessage(
       (msg) => {
+        if (msg.type === 'extension.frameDrawn') {
+          this.browserPage?.frameDrawn()
+          return
+        }
+
         // sent whenever the webview (re)loads, e.g. after being moved to another window
         if (msg.type === 'extension.ready') {
+          this.browserPage?.frameDrawn()
           this.sendConfiguration()
           this.emit('ready')
           return
@@ -204,10 +212,15 @@ export class Panel extends EventEmitter2 {
   }
 
   private sendConfiguration() {
+    const engine = this.browser.engine
+    const result: ExtensionConfiguration = {
+      ...this.config,
+      engineEndpoint: engine && this.browserPage ? { ...engine.endpoint, targetId: this.browserPage.id } : undefined,
+    }
     this.view?.postMessage({
       method: 'extension.appConfiguration',
       result: {
-        ...this.config,
+        ...result,
         isDebug: this.isDebugPage,
         // a browser tab opens DevTools in a tab of its own
         devToolsUrl: this.isRemote ? this.devToolsUrl : undefined,

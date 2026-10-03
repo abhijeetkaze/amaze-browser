@@ -1,3 +1,4 @@
+import { Buffer } from 'buffer'
 import EventEmitterEnhancer, { EnhancedEventEmitter } from 'event-emitter-enhancer'
 import type { Browser, CDPSession, Page } from 'puppeteer-core'
 import type { Protocol } from 'devtools-protocol'
@@ -13,9 +14,16 @@ enum ExposedFunc {
   EmitContextMenu = 'EMIT_AMAZE_BROWSER_ON_CONTEXT_MENU',
 }
 
+// a webview that stops reporting drawn frames (e.g. reloaded mid-frame) must not freeze the stream
+const FRAME_DRAWN_TIMEOUT = 1000
+
 export class BrowserPage extends EnhancedEventEmitter {
   private client: CDPSession
   private clipboard: Clipboard
+  // latest frame not yet sent to the webview; newer frames overwrite it so the view never lags behind
+  private pendingFrame: Protocol.Page.ScreencastFrameEvent | null = null
+  private frameSentAt = 0
+  private droppedFrames = 0
 
   constructor(
     public readonly browser: Browser,
@@ -171,12 +179,46 @@ export class BrowserPage extends EnhancedEventEmitter {
       } as any)
     })
 
+    // ack right away: Chromium drops frames while 3 are unacked, so acking from the webview capped the fps
+    this.client.on('Page.screencastFrame', (frame: Protocol.Page.ScreencastFrameEvent) => {
+      this.client.send('Page.screencastFrameAck', { sessionId: frame.sessionId }).catch(() => {})
+      if (this.pendingFrame)
+        this.droppedFrames++
+      this.pendingFrame = frame
+      this.flushFrame()
+    })
+
     // headless Chromium has no file dialog: show VS Code's instead when a page asks for files
     await this.client.send('Page.enable')
     await this.client.send('Page.setInterceptFileChooserDialog', { enabled: true })
     this.client.on('Page.fileChooserOpened', e => this.handleFileChooser(e).catch((err) => {
       window.showErrorMessage(`Amaze Browser: Failed to upload files: ${err instanceof Error ? err.message : err}`)
     }))
+  }
+
+  // the webview drew the last frame (or reloaded): it can take the next one
+  public frameDrawn() {
+    this.frameSentAt = 0
+    this.flushFrame()
+  }
+
+  // sends the pending frame unless the webview is still drawing the previous one
+  private flushFrame() {
+    const frame = this.pendingFrame
+    if (!frame || (this.frameSentAt && Date.now() - this.frameSentAt < FRAME_DRAWN_TIMEOUT))
+      return
+    this.pendingFrame = null
+    this.frameSentAt = Date.now()
+
+    // binary instead of base64: VS Code transfers ArrayBuffers to webviews without serializing them
+    const buffer = Buffer.from(frame.data, 'base64')
+    const data = buffer.byteOffset === 0 && buffer.byteLength === buffer.buffer.byteLength
+      ? buffer.buffer
+      : buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength)
+    this.emit({
+      method: 'extension.screencastFrame',
+      result: { data, metadata: frame.metadata, droppedFrames: this.droppedFrames },
+    } as any)
   }
 
   private async handleFileChooser({ backendNodeId, mode }: Protocol.Page.FileChooserOpenedEvent) {

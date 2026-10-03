@@ -38,6 +38,7 @@ export function activate(ctx: ExtensionContext) {
       server = starting
       // with VS Code Remote, this is the forwarded address on the user's machine
       serverUrl = await env.asExternalUri(Uri.parse(`http://localhost:${port}/`))
+      starting.allowForwardedAddress(serverUrl.authority)
       serverStatus.text = `$(broadcast) Amaze :${port}`
       serverStatus.tooltip = `Amaze Browser is served at ${serverUrl.toString(true)}. Click to open it.`
       serverStatus.show()

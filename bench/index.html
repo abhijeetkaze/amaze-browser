@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Amaze Browser screencast bench</title>
+  <style>
+    body { margin: 0; font: 14px system-ui, sans-serif; background: #111; color: #eee; }
+    header { position: sticky; top: 0; padding: 8px 16px; background: #222; display: flex; gap: 16px; align-items: center; }
+    #clock { font: 32px monospace; }
+    .spinner { width: 80px; height: 80px; border: 8px solid #444; border-top-color: #4af; border-radius: 50%; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    canvas { display: block; margin: 16px; }
+    .row { height: 120px; margin: 8px 16px; border-radius: 6px; }
+  </style>
+</head>
+<body>
+  <!-- Open in Amaze Browser with "amaze-browser.perfHud": true and compare the overlay numbers -->
+  <header>
+    <div class="spinner"></div>
+    <!-- epoch ms on screen: compare against a real clock to see glass-to-glass latency -->
+    <div id="clock"></div>
+  </header>
+  <canvas id="c" width="800" height="300"></canvas>
+  <div id="rows"></div>
+  <script>
+    const clock = document.getElementById('clock')
+    const ctx = document.getElementById('c').getContext('2d')
+    function tick(t) {
+      clock.textContent = Date.now()
+      ctx.fillStyle = '#111'
+      ctx.fillRect(0, 0, 800, 300)
+      for (let i = 0; i < 40; i++) {
+        ctx.fillStyle = `hsl(${(i * 9 + t / 10) % 360} 80% 60%)`
+        ctx.beginPath()
+        ctx.arc(400 + Math.cos(t / 500 + i) * 350, 150 + Math.sin(t / 300 + i) * 120, 12, 0, Math.PI * 2)
+        ctx.fill()
+      }
+      requestAnimationFrame(tick)
+    }
+    requestAnimationFrame(tick)
+
+    // a long page for scroll tests
+    const rows = document.getElementById('rows')
+    for (let i = 0; i < 200; i++) {
+      const row = document.createElement('div')
+      row.className = 'row'
+      row.style.background = `linear-gradient(90deg, hsl(${i * 7} 60% 40%), hsl(${i * 7 + 90} 60% 30%))`
+      row.textContent = `Row ${i}`
+      rows.appendChild(row)
+    }
+  </script>
+</body>
+</html>

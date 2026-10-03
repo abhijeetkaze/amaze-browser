@@ -53,6 +53,8 @@ export function getConfigs(ctx: ExtensionContext): ExtensionConfiguration {
     everyNthFrame: getConfig('amaze-browser.everyNthFrame', 1),
     format: getConfig('amaze-browser.format', 'jpeg'),
     isVerboseMode: getConfig('amaze-browser.verbose', false),
+    perfHud: getConfig('amaze-browser.perfHud', false),
+    engine: getConfig<'ts' | 'rust'>('amaze-browser.engine', 'ts')!,
     chromeExecutable: getConfig('amaze-browser.chromeExecutable'),
     startUrl: getConfig('amaze-browser.startUrl', 'https://github.com/abhijeetkaze/amaze-browser'),
     debugHost: getConfig('amaze-browser.debugHost', 'localhost'),

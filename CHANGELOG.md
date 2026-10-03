@@ -3,18 +3,6 @@
 All notable changes to Amaze Browser are documented here.
 This project follows [Semantic Versioning](https://semver.org/).
 
-## [1.4.1] - 2026-10-03
-
-### Fixed
-
-- The page served by the HTTP server could keep reloading itself. It now reconnects without reloading where it can, stops after 3 reloads in 30 seconds, and shows a bar saying why it isn't live: the page is open in another tab (with **Use here**), VS Code can't be reached, or the connection keeps dropping
-
-## [1.4.0] - 2026-10-03
-
-### Fixed
-
-- The HTTP server's page links its files and connection relative to its own address, so it also loads when served under a sub-path, for example behind a proxy at `/proxy/8100/`
-
 ## [1.3.0] - 2026-10-03
 
 ### Added
@@ -90,8 +78,6 @@ The first release of Amaze Browser, a fork of [Browse Lite](https://github.com/a
 - Panels moved to another window reconnect instead of coming back blank
 - No orange focus outline in inputs, broken-image icon before the first frame, or wrong viewport background
 
-[1.4.1]: https://github.com/abhijeetkaze/amaze-browser/releases/tag/v1.4.1
-[1.4.0]: https://github.com/abhijeetkaze/amaze-browser/releases/tag/v1.4.0
 [1.3.0]: https://github.com/abhijeetkaze/amaze-browser/releases/tag/v1.3.0
 [1.2.0]: https://github.com/abhijeetkaze/amaze-browser/releases/tag/v1.2.0
 [1.1.0]: https://github.com/abhijeetkaze/amaze-browser/releases/tag/v1.1.0
