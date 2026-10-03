@@ -3,6 +3,25 @@
 All notable changes to Amaze Browser are documented here.
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [1.1.0] - 2026-10-03
+
+### Added
+
+- Sponsor link in the marketplace listing and README, and a support item in the history menu
+- An occasional notification asking regular users to support the project, at most twice and never again once they support or decline (turn off with `amaze-browser.showSupportPrompt`), and a **Show Support Notification** command
+
+### Changed
+
+- Pages stream as JPEG at quality 80 instead of lossless PNG, for much smaller frames
+- Smoother scrolling and animation with lower CPU use: frames are shown as soon as they are decoded instead of queueing up, and no longer re-render the whole browser UI
+- Faster cursor updates when moving the mouse over the page
+- Inspect mode no longer redraws the highlight on every frame, and the page is only tracked for inspecting while Inspect is on
+- Navigation no longer waits on a user agent reset before every page load
+
+### Fixed
+
+- An emulated device's user agent is kept after navigating instead of being reset
+
 ## [1.0.1] - 2026-10-03
 
 ### Changed
@@ -38,5 +57,6 @@ The first release of Amaze Browser, a fork of [Browse Lite](https://github.com/a
 - Panels moved to another window reconnect instead of coming back blank
 - No orange focus outline in inputs, broken-image icon before the first frame, or wrong viewport background
 
+[1.1.0]: https://github.com/abhijeetkaze/amaze-browser/releases/tag/v1.1.0
 [1.0.1]: https://github.com/abhijeetkaze/amaze-browser/releases/tag/v1.0.1
 [1.0.0]: https://github.com/abhijeetkaze/amaze-browser/releases/tag/v1.0.0
