@@ -9,6 +9,7 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 - Sponsor link in the marketplace listing and README, and a support item in the history menu
 - An occasional notification asking regular users to support the project, at most twice and never again once they support or decline (turn off with `amaze-browser.showSupportPrompt`), and a **Show Support Notification** command
+- Page zoom from the toolbar (zoom out, the current level, zoom in) and with <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>=</kbd>, <kbd>-</kbd> and <kbd>0</kbd>, in Chrome's steps from 25% to 500%; the page re-lays out like in a browser
 
 ### Changed
 

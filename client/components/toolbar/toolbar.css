@@ -60,3 +60,17 @@
   opacity: 0.35;
   cursor: default;
 }
+
+/* the zoom percentage: fixed width so the buttons beside it don't shift */
+.toolbar-zoom-level {
+  width: 44px;
+  font-family: var(--ab-font);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* at 100% it is a plain readout, not a dimmed button */
+.toolbar-zoom-level:disabled {
+  opacity: 1;
+  color: var(--ab-muted);
+}

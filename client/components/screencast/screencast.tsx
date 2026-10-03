@@ -117,12 +117,18 @@ class Screencast extends React.Component<any, any> {
     this.props.onMouseMoved({ position })
   }
 
+  // webview pixels per CSS pixel of the page: the view's fit-to-window zoom times the page zoom
+  private get pixelScale() {
+    const { screenZoom, pageZoom = 1 } = this.props.viewportMetadata
+    return screenZoom * pageZoom
+  }
+
   private convertIntoScreenSpace(event: any, state: any) {
-    const { screenZoom } = this.props.viewportMetadata
+    const scale = this.pixelScale
 
     return {
-      x: Math.round(event.nativeEvent.offsetX / screenZoom),
-      y: Math.round(event.nativeEvent.offsetY / screenZoom),
+      x: Math.round(event.nativeEvent.offsetX / scale),
+      y: Math.round(event.nativeEvent.offsetY / scale),
     }
   }
 
@@ -206,10 +212,10 @@ class Screencast extends React.Component<any, any> {
     if (!(event.type in types))
       return
 
-    const { screenZoom } = this.props.viewportMetadata
+    const scale = this.pixelScale
 
-    const x = Math.round(event.offsetX / screenZoom)
-    const y = Math.round(event.offsetY / screenZoom)
+    const x = Math.round(event.offsetX / scale)
+    const y = Math.round(event.offsetY / scale)
 
     const type = (types as any)[event.type]
 
@@ -228,8 +234,8 @@ class Screencast extends React.Component<any, any> {
     }
 
     if (type === 'mouseWheel') {
-      params.deltaX = event.deltaX / screenZoom
-      params.deltaY = event.deltaY / screenZoom
+      params.deltaX = event.deltaX / scale
+      params.deltaY = event.deltaY / scale
     }
 
     this.props.onInteraction('Input.dispatchMouseEvent', params)

@@ -6,7 +6,8 @@ import DeviceSettings from '../device-settings/device-settings'
 import Menu from '../menu/menu'
 import type { MenuEntry, MenuPosition } from '../menu/menu'
 import type { HistoryEntry } from '../../../src/HistoryEntry'
-import { ArrowLeftIcon, ArrowRightIcon, DeviceIcon, HistoryIcon, PlusIcon, ReloadIcon, StopIcon } from '../icons/icons'
+import { ArrowLeftIcon, ArrowRightIcon, DeviceIcon, HistoryIcon, PlusIcon, ReloadIcon, StopIcon, ZoomInIcon, ZoomOutIcon } from '../icons/icons'
+import { MAX_ZOOM, MIN_ZOOM } from '../../utils/pageZoom'
 
 function hostname(url: string) {
   try {
@@ -59,6 +60,8 @@ class Toolbar extends React.PureComponent<IToolbarProps, IToolbarState> {
 
     // canGoBack/canGoForward are true when navigation in that direction is NOT possible
     const isLoading = !!this.viewportMetadata?.isLoading
+    const pageZoom: number = this.viewportMetadata?.pageZoom ?? 1
+    const mod = /macintosh|mac os x/i.test(navigator.userAgent) ? '⌘' : 'Ctrl+'
 
     return (
       <div className="toolbar">
@@ -96,7 +99,35 @@ class Toolbar extends React.PureComponent<IToolbarProps, IToolbarState> {
             onUrlChanged={this.handleUrlChange}
             onActionInvoked={this.props.onActionInvoked}
           />
-          <div className="toolbar-group">
+          <div className="toolbar-group" role="group" aria-label="Zoom">
+            <button
+              className="toolbar-button"
+              title={`Zoom out (${mod}-)`}
+              aria-label="Zoom out"
+              onClick={() => this.props.onActionInvoked('zoomOut')}
+              disabled={pageZoom <= MIN_ZOOM}
+            >
+              <ZoomOutIcon />
+            </button>
+            <button
+              className="toolbar-button toolbar-zoom-level"
+              title={`Reset zoom (${mod}0)`}
+              aria-label={`Zoom ${Math.round(pageZoom * 100)}%, reset to 100%`}
+              onClick={() => this.props.onActionInvoked('zoomReset')}
+              disabled={pageZoom === 1}
+            >
+              {`${Math.round(pageZoom * 100)}%`}
+            </button>
+            <button
+              className="toolbar-button"
+              title={`Zoom in (${mod}=)`}
+              aria-label="Zoom in"
+              onClick={() => this.props.onActionInvoked('zoomIn')}
+              disabled={pageZoom >= MAX_ZOOM}
+            >
+              <ZoomInIcon />
+            </button>
+            <span className="toolbar-divider" aria-hidden="true" />
             <button
               className={`toolbar-button ${this.state.historyMenuPosition ? 'active' : ''}`}
               title="History"

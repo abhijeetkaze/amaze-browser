@@ -15,6 +15,7 @@ import type { MenuEntry, MenuPosition } from './components/menu/menu'
 import Connection from './connection'
 import { CDPHelper } from './utils/cdpHelper'
 import { cursorAtExpression } from './utils/cursorAtPoint'
+import { nextZoomLevel, previousZoomLevel } from './utils/pageZoom'
 
 interface ElementSource {
   charNumber: number
@@ -60,6 +61,8 @@ interface IViewport {
   } | null
   deviceSizeRatio: number
   screenZoom: number
+  // zoom of the page itself, like a browser's Ctrl+=/Ctrl+-; screenZoom only fits the view to the window
+  pageZoom: number
 }
 
 class App extends React.Component<any, IState> {
@@ -109,6 +112,7 @@ class App extends React.Component<any, IState> {
         isResizable: false,
         loadingPercent: 0.0,
         screenZoom: 1,
+        pageZoom: 1,
       },
     }
 
@@ -119,17 +123,33 @@ class App extends React.Component<any, IState> {
     this.handleFind = this.handleFind.bind(this)
     this.closeFind = this.closeFind.bind(this)
 
-    // Ctrl/Cmd+F opens our find bar; it must not reach the page or VS Code,
-    // which can only search the webview (a screenshot of the page)
+    // Ctrl/Cmd+F opens our find bar and Ctrl/Cmd+=/-/0 zoom the page; they must not
+    // reach the page or VS Code, which would search or zoom the webview (a screenshot of the page)
+    const zoomShortcuts: Record<string, string> = {
+      Equal: 'zoomIn',
+      NumpadAdd: 'zoomIn',
+      Minus: 'zoomOut',
+      NumpadSubtract: 'zoomOut',
+      Digit0: 'zoomReset',
+      Numpad0: 'zoomReset',
+    }
     window.addEventListener('keydown', (event) => {
-      if (this.state.isDebug || !(event.ctrlKey || event.metaKey) || event.altKey || event.code !== 'KeyF')
+      if (this.state.isDebug || !(event.ctrlKey || event.metaKey) || event.altKey)
         return
+      if (event.code === 'KeyF') {
+        if (this.state.isFindOpen)
+          this.findBar?.focus()
+        else
+          this.updateState({ isFindOpen: true, findResult: null })
+      }
+      else if (zoomShortcuts[event.code]) {
+        this.onToolbarActionInvoked(zoomShortcuts[event.code], {})
+      }
+      else {
+        return
+      }
       event.preventDefault()
       event.stopPropagation()
-      if (this.state.isFindOpen)
-        this.findBar?.focus()
-      else
-        this.updateState({ isFindOpen: true, findResult: null })
     }, true)
 
     // remember where the screencast was right-clicked, the page reports
@@ -514,12 +534,7 @@ class App extends React.Component<any, IState> {
         break
       case 'size':
         if (data.height !== undefined && data.width !== undefined) {
-          this.connection.send('Page.setDeviceMetricsOverride', {
-            deviceScaleFactor: window.devicePixelRatio || 1,
-            mobile: false,
-            height: Math.floor(data.height),
-            width: Math.floor(data.width),
-          })
+          this.setDeviceMetrics(data.width, data.height, this.state.viewportMetadata.pageZoom)
           this.nextViewportSize = {
             height: data.height,
             width: data.width,
@@ -528,6 +543,30 @@ class App extends React.Component<any, IState> {
 
         break
     }
+  }
+
+  // Zooming works like a browser's: the page gets a CSS viewport smaller by the zoom
+  // factor and a pixel ratio larger by it, so it re-lays out (media queries and
+  // devicePixelRatio follow) while frames keep the size of the view.
+  private setDeviceMetrics(width: number, height: number, pageZoom: number) {
+    this.connection.send('Page.setDeviceMetricsOverride', {
+      deviceScaleFactor: (window.devicePixelRatio || 1) * pageZoom,
+      mobile: false,
+      height: Math.floor(height / pageZoom),
+      width: Math.floor(width / pageZoom),
+    })
+  }
+
+  private setPageZoom(pageZoom: number) {
+    const { width, height } = this.state.viewportMetadata
+    if (pageZoom === this.state.viewportMetadata.pageZoom)
+      return
+
+    this.updateState({
+      viewportMetadata: { ...this.state.viewportMetadata, pageZoom },
+    })
+    if (width && height)
+      this.setDeviceMetrics(width, height, pageZoom)
   }
 
   private async updateState(newState: Partial<IState>) {
@@ -659,6 +698,15 @@ class App extends React.Component<any, IState> {
         break
       case 'inspect':
         this.handleToggleInspect()
+        break
+      case 'zoomIn':
+        this.setPageZoom(nextZoomLevel(this.state.viewportMetadata.pageZoom))
+        break
+      case 'zoomOut':
+        this.setPageZoom(previousZoomLevel(this.state.viewportMetadata.pageZoom))
+        break
+      case 'zoomReset':
+        this.setPageZoom(1)
         break
       case 'emulateDevice':
         this.handleToggleDeviceEmulation()
