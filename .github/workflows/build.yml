@@ -53,6 +53,11 @@ jobs:
       # publishes to open-vsx.org; versions already published are skipped
       - name: Publish to Open VSX
         if: github.ref == 'refs/heads/main'
-        run: npx ovsx publish --packagePath bin/*.vsix --pat "$OVSX_PAT" --skip-duplicate
+        # --skip-duplicate misses a version Open VSX is still processing
+        run: |
+          if ! npx ovsx publish --packagePath bin/*.vsix --pat "$OVSX_PAT" --skip-duplicate 2>&1 | tee publish.log; then
+            grep -q 'is already published' publish.log || exit 1
+          fi
+        shell: bash
         env:
           OVSX_PAT: ${{ secrets.OVSX_PAT }}
