@@ -1,5 +1,5 @@
 import * as path from 'path'
-import type { Disposable, TextDocument, WebviewPanel } from 'vscode'
+import type { Disposable, TextDocument } from 'vscode'
 import { Position, Selection, Uri, ViewColumn, commands, env, window, workspace } from 'vscode'
 import { EventEmitter2 } from 'eventemitter2'
 
@@ -9,12 +9,14 @@ import type { ExtensionConfiguration } from './ExtensionConfiguration'
 import type { HistoryEntry } from './HistoryEntry'
 import { getConfig } from './Config'
 import { ContentProvider } from './ContentProvider'
+import type { PanelView } from './PanelView'
+import { WebviewPanelView } from './PanelView'
 
 export type DevToolsPosition = 'right' | 'bottom' | 'left' | 'window'
 
 export class Panel extends EventEmitter2 {
   private static readonly viewType = 'amaze-browser'
-  private _panel: WebviewPanel | null
+  private view: PanelView | null
   public disposables: Disposable[] = []
   public url = ''
   public title = ''
@@ -32,7 +34,7 @@ export class Panel extends EventEmitter2 {
   constructor(config: ExtensionConfiguration, browser: BrowserClient, parentPanel?: Panel) {
     super()
     this.config = config
-    this._panel = null
+    this.view = null
     this.browserPage = null
     this.browser = browser
     this.parentPanel = parentPanel
@@ -46,13 +48,17 @@ export class Panel extends EventEmitter2 {
     return !!this.parentPanel
   }
 
-  public async launch(startUrl?: string, column: ViewColumn = ViewColumn.Two) {
+  get isRemote() {
+    return !!this.view?.isRemote
+  }
+
+  // the panel's UI is a new VS Code webview in `target`, or an existing view such as a browser tab
+  public async launch(startUrl?: string, target: ViewColumn | PanelView = ViewColumn.Two) {
     try {
       this.browserPage = await this.browser.newPage()
       if (this.browserPage) {
         this.browserPage.else((data: any) => {
-          if (this._panel)
-            this._panel.webview.postMessage(data)
+          this.view?.postMessage(data)
         })
       }
     }
@@ -60,22 +66,16 @@ export class Panel extends EventEmitter2 {
       window.showErrorMessage(err.message)
     }
 
-    this._panel = window.createWebviewPanel(
-      Panel.viewType,
-      'Amaze Browser',
-      column,
-      {
-        enableScripts: true,
-        retainContextWhenHidden: true,
-        localResourceRoots: [
-          Uri.file(path.join(this.config.extensionPath, 'dist/client')),
-        ],
-      },
-    )
-    this._panel.webview.html = this.contentProvider.getContent(this._panel.webview)
-    this._panel.onDidDispose(() => this.dispose(), null, this.disposables)
-    this._panel.onDidChangeViewState(() => this.emit(this._panel.active ? 'focus' : 'blur'), null, this.disposables)
-    this._panel.webview.onDidReceiveMessage(
+    // before listening: a browser tab's first message may already be waiting for the configuration
+    if (startUrl) {
+      this.initialUrl = startUrl
+      this.url = this.url || startUrl
+    }
+
+    this.view = typeof target === 'object' ? target : this.createWebview(target)
+    this.view.onDidDispose(() => this.dispose(), null, this.disposables)
+    this.view.onDidChangeActive(active => this.emit(active ? 'focus' : 'blur'), null, this.disposables)
+    this.view.onDidReceiveMessage(
       (msg) => {
         // sent whenever the webview (re)loads, e.g. after being moved to another window
         if (msg.type === 'extension.ready') {
@@ -86,12 +86,12 @@ export class Panel extends EventEmitter2 {
 
         if (msg.type === 'extension.updateTitle') {
           this.title = msg.params.title
-          if (this._panel) {
-            this._panel.title = this.isDebugPage ? `DevTools - ${this.parentPanel.title}` : msg.params.title
+          if (this.view) {
+            this.view.setTitle(this.isDebugPage ? `DevTools - ${this.parentPanel.title}` : msg.params.title)
             if (!this.isDebugPage && this.browserPage)
               this.emit('pageVisited', { url: this.browserPage.page.url(), title: msg.params.title })
             try {
-              this._panel.iconPath = Uri.parse(`https://favicon.yandex.net/favicon/${new URL(this.browserPage?.page.url() || '').hostname}`)
+              this.view.setIcon(`https://favicon.yandex.net/favicon/${new URL(this.browserPage?.page.url() || '').hostname}`)
             }
             catch (err) {}
             return
@@ -174,20 +174,43 @@ export class Panel extends EventEmitter2 {
       this.disposables,
     )
 
-    if (startUrl) {
-      this.initialUrl = startUrl
-      this.url = this.url || startUrl
-    }
+    if (!this.isRemote)
+      this.emit('focus')
+  }
 
-    this.emit('focus')
+  private createWebview(column: ViewColumn) {
+    const panel = window.createWebviewPanel(
+      Panel.viewType,
+      'Amaze Browser',
+      column,
+      {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+        localResourceRoots: [
+          Uri.file(path.join(this.config.extensionPath, 'dist/client')),
+        ],
+      },
+    )
+    panel.webview.html = this.contentProvider.getContent(panel.webview)
+    return new WebviewPanelView(panel)
+  }
+
+  // DevTools for this page, served by Chromium itself
+  private get devToolsUrl() {
+    if (!this.browserPage)
+      return undefined
+    const domain = `${this.config.debugHost}:${this.config.debugPort}`
+    return `http://${domain}/devtools/inspector.html?ws=${domain}/devtools/page/${this.browserPage.id}&experiments=true`
   }
 
   private sendConfiguration() {
-    this._panel?.webview.postMessage({
+    this.view?.postMessage({
       method: 'extension.appConfiguration',
       result: {
         ...this.config,
         isDebug: this.isDebugPage,
+        // a browser tab opens DevTools in a tab of its own
+        devToolsUrl: this.isRemote ? this.devToolsUrl : undefined,
         // only navigate on the first load; a reloaded webview keeps the current page
         startUrl: this.configured ? undefined : this.initialUrl,
       },
@@ -196,7 +219,7 @@ export class Panel extends EventEmitter2 {
   }
 
   public navigateTo(url: string) {
-    this._panel.webview.postMessage({
+    this.view?.postMessage({
       method: 'extension.navigateTo',
       result: {
         url,
@@ -224,11 +247,10 @@ export class Panel extends EventEmitter2 {
       this.debugPanel = undefined
     })
     const position = getConfig<DevToolsPosition>('amaze-browser.devToolsPosition', 'right')!
-    const domain = `${this.config.debugHost}:${this.config.debugPort}`
-    const url = `http://${domain}/devtools/inspector.html?ws=${domain}/devtools/page/${this.browserPage.id}&experiments=true`
+    const url = this.devToolsUrl!
 
     // place DevTools relative to this page's editor group
-    this._panel?.reveal(undefined, false)
+    this.view?.reveal()
     let column = ViewColumn.Beside
     if (position === 'bottom' || position === 'left') {
       await commands.executeCommand(position === 'bottom' ? 'workbench.action.newGroupBelow' : 'workbench.action.newGroupLeft')
@@ -277,28 +299,29 @@ export class Panel extends EventEmitter2 {
   }
 
   public postHistory(entries: HistoryEntry[]) {
-    this._panel?.webview.postMessage({
+    this.view?.postMessage({
       method: 'extension.history',
       result: entries,
     })
   }
 
   public setViewport(viewport: any) {
-    this._panel!.webview.postMessage({
+    this.view?.postMessage({
       method: 'extension.viewport',
       result: viewport,
     })
   }
 
   public show() {
-    if (this._panel)
-      this._panel.reveal()
+    this.view?.reveal()
   }
 
   public dispose() {
+    // a view reports its own disposal back here
+    if (this.disposed)
+      return
     this.disposed = true
-    if (this._panel)
-      this._panel.dispose()
+    this.view?.dispose()
 
     if (this.browserPage) {
       this.browserPage.dispose()

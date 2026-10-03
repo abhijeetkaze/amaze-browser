@@ -31,6 +31,7 @@ interface IState {
   errorText: string | undefined
   everyNthFrame: number
   isDebug: boolean
+  devToolsUrl?: string
   isVerboseMode: boolean
   isInspectEnabled: boolean
   isDeviceEmulationEnabled: boolean
@@ -229,13 +230,16 @@ class App extends React.Component<any, IState> {
     })
 
     this.connection.on('Page.windowOpen', (result: any) => {
-      this.connection.send('extension.windowOpenRequested', {
-        url: result.url,
-      })
+      this.openInNewTab(result.url)
     })
 
     this.connection.on('Page.javascriptDialogOpening', (result: any) => {
       const { url, message, type } = result
+
+      if (this.connection.isRemote) {
+        this.handleDialogNatively(type, message, result.defaultPrompt)
+        return
+      }
 
       this.connection.send('extension.windowDialogRequested', {
         url,
@@ -392,8 +396,11 @@ class App extends React.Component<any, IState> {
       return []
 
     const mod = this.isMac ? '⌘' : 'Ctrl+'
-    const openInNewTab = (url: string) => this.connection.send('extension.windowOpenRequested', { url })
-    const openExternal = (url: string) => this.connection.send('extension.openExternal', { url })
+    const openInNewTab = (url: string) => this.openInNewTab(url)
+    // a browser tab is already in the system browser
+    const openExternal = (url: string) => this.connection.isRemote
+      ? window.open(url, '_blank', 'noopener')
+      : this.connection.send('extension.openExternal', { url })
     const copy = (value: string) => this.handleClipboardWrite({ value })
     const evaluate = (expression: string) => this.connection.send('Runtime.evaluate', { expression, userGesture: true })
 
@@ -460,23 +467,67 @@ class App extends React.Component<any, IState> {
     }
 
     if (!this.state.isDebug)
-      groups.push([{ label: 'Open DevTools', action: () => this.connection.send('extension.openDevTools') }])
+      groups.push([{ label: 'Open DevTools', action: () => this.openDevTools() }])
 
     return groups.flatMap((group, i) => i === 0 ? group : [null, ...group])
   }
+
+  // a VS Code panel, or a tab of the user's browser when served by the HTTP server
+  private openInNewTab(url: string) {
+    if (!this.connection.isRemote) {
+      this.connection.send('extension.windowOpenRequested', { url })
+      return
+    }
+    // a popup the page opens without a click can be blocked: then it opens here instead
+    if (!window.open(`/?newTab&url=${encodeURIComponent(url)}`, '_blank'))
+      this.handleNavigate(url)
+  }
+
+  private openDevTools() {
+    if (this.connection.isRemote && this.state.devToolsUrl)
+      window.open(this.state.devToolsUrl, '_blank', 'noopener')
+    else
+      this.connection.send('extension.openDevTools')
+  }
+
+  // a browser tab shows the page's alert/confirm/prompt as its own
+  /* eslint-disable no-alert */
+  private handleDialogNatively(type: string, message: string, defaultPrompt?: string) {
+    let accept = true
+    let promptText: string | undefined
+    if (type === 'alert') {
+      window.alert(message)
+    }
+    else if (type === 'prompt') {
+      const answer = window.prompt(message, defaultPrompt)
+      accept = answer !== null
+      promptText = answer ?? undefined
+    }
+    else {
+      // confirm, and beforeunload's "Leave site?"
+      accept = window.confirm(message || 'Leave this page? Changes you made may not be saved.')
+    }
+    this.connection.send('Page.handleJavaScriptDialog', { accept, promptText })
+  }
+  /* eslint-enable no-alert */
 
   public stopCasting() {
     this.connection.send('Page.stopScreencast')
   }
 
-  public startCasting() {
+  public startCasting(retries = 50) {
     const params = {
       quality: this.state.quality,
       format: this.state.format,
       everyNthFrame: this.state.everyNthFrame,
     }
 
-    this.connection.send('Page.startScreencast', params)
+    // Chromium refuses while the page is mid-navigation ("Not attached to an active page"),
+    // e.g. when a resize restarts the screencast right as a page starts loading
+    this.connection.send('Page.startScreencast', params).catch(() => {
+      if (retries > 0)
+        setTimeout(() => this.startCasting(retries - 1), 200)
+    })
   }
 
   private async requestNavigationHistory() {
@@ -505,6 +556,8 @@ class App extends React.Component<any, IState> {
     this.connection.send('extension.updateTitle', {
       title: panelTitle,
     })
+    if (this.connection.isRemote)
+      document.title = panelTitle
   }
 
   private async onViewportChanged(action: string, data: any) {
@@ -715,7 +768,10 @@ class App extends React.Component<any, IState> {
         this.handleNavigate(data.url)
         break
       case 'newTab':
-        this.connection.send('extension.newTab')
+        if (this.connection.isRemote)
+          window.open('/?newTab', '_blank')
+        else
+          this.connection.send('extension.newTab')
         break
       case 'clearBrowsingData':
         this.connection.send('extension.clearBrowsingData')

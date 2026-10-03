@@ -61,6 +61,16 @@
       },
       {
         "category": "Amaze Browser",
+        "command": "amaze-browser.startServer",
+        "title": "Start HTTP Server (Open in Your Browser)"
+      },
+      {
+        "category": "Amaze Browser",
+        "command": "amaze-browser.stopServer",
+        "title": "Stop HTTP Server"
+      },
+      {
+        "category": "Amaze Browser",
         "command": "amaze-browser.moveDevTools",
         "title": "Move DevTools...",
         "icon": "$(layout)"
@@ -97,6 +107,11 @@
         "command": "amaze-browser.controls.debug",
         "title": "Open debug page",
         "icon": "$(bug)"
+      },
+      {
+        "category": "Amaze Browser",
+        "command": "amaze-browser.openServerInBrowser",
+        "title": "Open HTTP Server in Your Browser"
       }
     ],
     "configuration": {
@@ -194,6 +209,11 @@
         "amaze-browser.otherArgs": {
           "description": "Add other parameters during initial loading of the browser.",
           "type": "string"
+        },
+        "amaze-browser.server.port": {
+          "default": 8100,
+          "description": "Port of the HTTP server started by \"Amaze Browser: Start HTTP Server\", which lets you use Amaze Browser from your own browser at http://localhost:<port>. It only accepts connections from this machine.",
+          "type": "number"
         }
       }
     },
@@ -344,6 +364,10 @@
         {
           "command": "amaze-browser.controls.debug",
           "when": "false"
+        },
+        {
+          "command": "amaze-browser.openServerInBrowser",
+          "when": "false"
         }
       ]
     }
@@ -367,6 +391,7 @@
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.13",
     "@types/vscode": "1.83.0",
+    "@types/ws": "^8.18.2",
     "@vitejs/plugin-react-refresh": "^1.3.6",
     "@vscode/vsce": "^2.21.1",
     "browser-viewport-device-descriptions": "^1.1.0",
@@ -387,7 +412,8 @@
     "rimraf": "^5.0.5",
     "tsup": "^7.2.0",
     "typescript": "^5.2.2",
-    "vite": "^4.4.11"
+    "vite": "^4.4.11",
+    "ws": "^8.22.0"
   },
   "extensionKind": [
     "ui",
