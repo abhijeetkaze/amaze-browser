@@ -9,15 +9,16 @@ permissions:
   contents: write
 
 jobs:
-  # one VSIX per platform, each with its own Rust engine binary, plus a universal one
-  # without the engine that VS Code installs on other platforms (it uses the TS engine)
+  # one VSIX per platform, each with its own Rust engine binary (static musl on Linux, so it
+  # runs whatever the glibc version), plus a universal one without the engine that VS Code
+  # installs on other platforms (it uses the TS engine)
   build:
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { os: ubuntu-latest, vsce: linux-x64, rust: x86_64-unknown-linux-gnu }
-          - { os: ubuntu-24.04-arm, vsce: linux-arm64, rust: aarch64-unknown-linux-gnu }
+          - { os: ubuntu-latest, vsce: linux-x64, rust: x86_64-unknown-linux-musl }
+          - { os: ubuntu-24.04-arm, vsce: linux-arm64, rust: aarch64-unknown-linux-musl }
           - { os: macos-latest, vsce: darwin-arm64, rust: aarch64-apple-darwin }
           - { os: macos-latest, vsce: darwin-x64, rust: x86_64-apple-darwin }
           - { os: windows-latest, vsce: win32-x64, rust: x86_64-pc-windows-msvc }
