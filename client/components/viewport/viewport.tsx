@@ -5,10 +5,12 @@ import { Resizable } from 're-resizable'
 import debounce from 'lodash/debounce'
 import Loading from '../loading-bar/loading-bar'
 import Screencast from '../screencast/screencast'
+import type { ScreencastFrame } from '../screencast/screencast'
 import { ErrorPage } from '../error-page/error-page'
 
 class Viewport extends React.Component<any, any> {
   private viewportRef: React.RefObject<HTMLDivElement>
+  private screencast: Screencast | null = null
   private debouncedResizeHandler: any
   private viewportPadding: any
   private onActionInvoked: any
@@ -108,8 +110,8 @@ class Viewport extends React.Component<any, any> {
                 <Screencast
                   height={height}
                   width={width}
-                  frame={this.props.frame}
-                  format={this.props.format}
+                  ref={c => this.screencast = c}
+                  perfHud={this.props.perfHud}
                   viewportMetadata={viewport}
                   isInspectEnabled={this.props.isInspectEnabled}
                   onInspectElement={this.handleInspectElement}
@@ -122,6 +124,14 @@ class Viewport extends React.Component<any, any> {
         }
       </div>
     )
+  }
+
+  // returns false when there is nothing to draw on (e.g. the error page is showing)
+  public drawFrame(frame: ScreencastFrame, onDecoded: () => void) {
+    if (!this.screencast)
+      return false
+    this.screencast.drawFrame(frame, onDecoded).catch(() => {})
+    return true
   }
 
   public calculateViewport() {

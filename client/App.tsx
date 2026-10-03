@@ -13,7 +13,9 @@ import type { FindResult } from './utils/findInPage'
 import { clearFindExpression, findExpression } from './utils/findInPage'
 import type { MenuEntry, MenuPosition } from './components/menu/menu'
 import Connection from './connection'
+import type { ScreencastFrame } from './components/screencast/screencast'
 import { CDPHelper } from './utils/cdpHelper'
+import EngineStream from './engineStream'
 
 interface ElementSource {
   charNumber: number
@@ -24,7 +26,7 @@ interface ElementSource {
 
 interface IState {
   format: 'jpeg' | 'png'
-  frame: object | null
+  perfHud: boolean
   url: string
   quality: number
   errorText: string | undefined
@@ -61,8 +63,6 @@ interface IViewport {
   highlightInfo: object | null
   deviceSizeRatio: number
   screenZoom: number
-  scrollOffsetX: number
-  scrollOffsetY: number
 }
 
 class App extends React.Component<any, IState> {
@@ -73,14 +73,16 @@ class App extends React.Component<any, IState> {
   private findBar: FindBar | null = null
   private lastContextMenuPosition: { x: number, y: number } | null = null
   private readonly isMac = /macintosh|mac os x/i.test(navigator.userAgent)
+  private isPanelVisible = true
+  private engineStream: EngineStream | undefined
 
   constructor(props: any) {
     super(props)
     this.state = {
-      frame: null,
-      format: 'png',
+      perfHud: false,
+      format: 'jpeg',
       url: 'about:blank',
-      quality: 100,
+      quality: 80,
       everyNthFrame: 1,
       isVerboseMode: false,
       isDebug: false,
@@ -109,8 +111,6 @@ class App extends React.Component<any, IState> {
         isResizable: false,
         loadingPercent: 0.0,
         screenZoom: 1,
-        scrollOffsetX: 0,
-        scrollOffsetY: 0,
       },
     }
 
@@ -206,8 +206,19 @@ class App extends React.Component<any, IState> {
       }, 500)
     })
 
-    this.connection.on('Page.screencastFrame', (result: any) => {
-      this.handleScreencastFrame(result)
+    this.connection.on('extension.screencastFrame', (frame: ScreencastFrame) => {
+      this.handleScreencastFrame(frame)
+    })
+
+    // stop streaming while the panel is hidden, nobody sees those frames
+    this.connection.on('extension.visibility', ({ visible }: { visible: boolean }) => {
+      if (visible === this.isPanelVisible)
+        return
+      this.isPanelVisible = visible
+      if (visible)
+        this.startCasting()
+      else
+        this.stopCasting()
     })
 
     this.connection.on('Page.windowOpen', (result: any) => {
@@ -237,8 +248,24 @@ class App extends React.Component<any, IState> {
         if (!payload)
           return
 
+        // frames come straight from the Rust engine when it runs; the extension host streams them otherwise
+        if (payload.engineEndpoint && !this.engineStream) {
+          const stream: EngineStream = new EngineStream(
+            payload.engineEndpoint,
+            frame => this.handleScreencastFrame(frame, () => stream.frameDrawn()),
+            () => {
+              this.engineStream = undefined
+              this.startCasting()
+            },
+          )
+          this.engineStream = stream
+          // a screencast started through the extension host before this would make Chromium encode every frame twice
+          this.connection.send('Page.stopScreencast')
+        }
+
+        // the state isn't updated yet, cast with the received format and quality
         this.stopCasting()
-        this.startCasting()
+        this.startCasting(payload)
 
         if (payload.startUrl)
           this.handleNavigate(payload.startUrl)
@@ -273,26 +300,23 @@ class App extends React.Component<any, IState> {
     this.connection.send('extension.ready')
   }
 
-  private async handleScreencastFrame(result: any) {
-    const { sessionId, data, metadata } = result
-    this.connection.send('Page.screencastFrameAck', { sessionId })
+  // the sender (extension host or engine) acks Chromium and sends the next frame once this one is decoded
+  private handleScreencastFrame(frame: ScreencastFrame, frameDrawn = () => this.connection.notify('extension.frameDrawn')) {
+    if (!this.viewport?.drawFrame(frame, frameDrawn))
+      frameDrawn()
 
     this.requestNodeHighlighting()
 
-    await this.updateState({
-      frame: {
-        base64Data: data,
-        metadata,
-      },
-      viewportMetadata: {
-        ...this.state.viewportMetadata,
-        ...this.nextViewportSize,
-        scrollOffsetX: metadata.scrollOffsetX,
-        scrollOffsetY: metadata.scrollOffsetY,
-      },
-    })
-
-    this.nextViewportSize = undefined
+    // the first frame after a resize has the new size
+    if (this.nextViewportSize) {
+      this.updateState({
+        viewportMetadata: {
+          ...this.state.viewportMetadata,
+          ...this.nextViewportSize,
+        },
+      })
+      this.nextViewportSize = undefined
+    }
   }
 
   public componentDidUpdate() {
@@ -333,8 +357,7 @@ class App extends React.Component<any, IState> {
           viewport={this.state.viewportMetadata}
           isInspectEnabled={this.state.isInspectEnabled}
           isDeviceEmulationEnabled={this.state.isDeviceEmulationEnabled}
-          frame={this.state.frame}
-          format={this.state.format}
+          perfHud={this.state.perfHud}
           url={this.state.url}
           onActionInvoked={this.onToolbarActionInvoked}
           errorText={this.state.errorText}
@@ -362,7 +385,7 @@ class App extends React.Component<any, IState> {
     this.connection.send('Runtime.evaluate', { expression: clearFindExpression() })
     this.updateState({ isFindOpen: false, findResult: null })
     // give keyboard focus back to the page
-    document.querySelector<HTMLElement>('img.screencast')?.focus()
+    document.querySelector<HTMLElement>('.screencast')?.focus()
   }
 
   private closePageContextMenu() {
@@ -450,17 +473,26 @@ class App extends React.Component<any, IState> {
   }
 
   public stopCasting() {
-    this.connection.send('Page.stopScreencast')
+    if (this.engineStream)
+      this.engineStream.stop()
+    else
+      this.connection.send('Page.stopScreencast')
   }
 
-  public startCasting() {
+  public startCasting(config: Pick<IState, 'quality' | 'format' | 'everyNthFrame'> = this.state) {
+    if (!this.isPanelVisible)
+      return
+
     const params = {
-      quality: this.state.quality,
-      format: this.state.format,
-      everyNthFrame: this.state.everyNthFrame,
+      quality: config.quality,
+      format: config.format,
+      everyNthFrame: config.everyNthFrame,
     }
 
-    this.connection.send('Page.startScreencast', params)
+    if (this.engineStream)
+      this.engineStream.start(params)
+    else
+      this.connection.send('Page.startScreencast', params)
   }
 
   private async requestNavigationHistory() {

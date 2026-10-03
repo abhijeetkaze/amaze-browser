@@ -141,7 +141,7 @@
           "type": "number"
         },
         "amaze-browser.format": {
-          "default": "png",
+          "default": "jpeg",
           "enum": [
             "png",
             "jpeg"
@@ -155,9 +155,27 @@
           "type": "boolean"
         },
         "amaze-browser.quality": {
-          "default": 100,
+          "default": 80,
           "description": "Image quality of screencasting",
           "type": "number"
+        },
+        "amaze-browser.perfHud": {
+          "default": false,
+          "description": "Show a performance overlay (fps, frame latency, dropped frames, memory) on the page preview",
+          "type": "boolean"
+        },
+        "amaze-browser.engine": {
+          "default": "ts",
+          "enum": [
+            "ts",
+            "rust"
+          ],
+          "enumDescriptions": [
+            "Frames go through the extension host",
+            "Experimental: a native Rust process streams frames straight to the page preview (local sessions only)"
+          ],
+          "description": "Which engine streams the page preview",
+          "type": "string"
         },
         "amaze-browser.everyNthFrame": {
           "default": 1,

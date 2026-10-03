@@ -14,6 +14,7 @@ import { tryPort } from './Config'
 import { BrowserPage } from './BrowserPage'
 import { ensureChromium } from './ChromiumDownloader'
 import { Downloads } from './Downloads'
+import { Engine } from './Engine'
 
 export function getUserDataDir(ctx: ExtensionContext) {
   return join(ctx.globalStorageUri.fsPath, 'UserData')
@@ -28,6 +29,7 @@ export async function clearSavedCookies(ctx: ExtensionContext) {
 
 export class BrowserClient extends EventEmitter {
   private browser: Browser
+  public engine: Engine | undefined
 
   constructor(private config: ExtensionConfiguration, private ctx: ExtensionContext) {
     super()
@@ -84,6 +86,16 @@ export class BrowserClient extends EventEmitter {
     await new Downloads(await this.browser.target().createCDPSession()).enable()
       .catch(e => window.showWarningMessage(`Amaze Browser: Downloads are disabled: ${e instanceof Error ? e.message : e}`))
 
+    if (this.config.engine === 'rust') {
+      // the port Chromium really listens on: tryPort can miss a port taken on 127.0.0.1 only
+      const cdpPort = Number(new URL(this.browser.wsEndpoint()).port)
+      this.engine = await Engine.start(this.config.extensionPath, cdpPort)
+        .catch((e) => {
+          window.showWarningMessage(`Amaze Browser: Rust engine unavailable, using the default one: ${e instanceof Error ? e.message : e}`)
+          return undefined
+        })
+    }
+
     // close the initial empty page
     ; (await this.browser.pages()).map(i => i.close())
   }
@@ -136,6 +148,8 @@ export class BrowserClient extends EventEmitter {
         this.browser.close()
         this.browser = null
       }
+      this.engine?.dispose()
+      this.engine = undefined
       resolve()
     })
   }

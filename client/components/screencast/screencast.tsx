@@ -3,102 +3,148 @@ import './screencast.css'
 
 // This implementation is heavily inspired by https://cs.chromium.org/chromium/src/third_party/blink/renderer/devtools/front_end/screencast/ScreencastView.js
 
+export interface ScreencastFrame {
+  data: ArrayBuffer | Uint8Array<ArrayBuffer>
+  metadata: { timestamp?: number }
+  droppedFrames: number
+}
+
 class Screencast extends React.Component<any, any> {
-  private imageRef: React.RefObject<HTMLImageElement>
-  private frameId: number | null
+  private canvasRef: React.RefObject<HTMLCanvasElement>
+  private hudRef: React.RefObject<HTMLDivElement>
+  // decoded frame waiting for the next animation frame; a newer one replaces it
+  private nextBitmap: ImageBitmap | null = null
+  private nextTimestamp: number | undefined
+  private drawRequest: number | null = null
+  private hudTimer: number | undefined
+  private stats = { drawn: 0, skipped: 0, latency: 0, hostDropped: 0, lastHostDropped: 0 }
 
   constructor(props: any) {
     super(props)
-    this.imageRef = React.createRef()
-    this.frameId = null
+    this.canvasRef = React.createRef()
+    this.hudRef = React.createRef()
 
     this.handleMouseEvent = this.handleMouseEvent.bind(this)
     this.handleKeyEvent = this.handleKeyEvent.bind(this)
-    this.renderLoop = this.renderLoop.bind(this)
-
-    this.state = {
-      imageZoom: 1,
-      screenOffsetTop: 0,
-    }
-  }
-
-  static getDerivedStateFromProps(nextProps: any, prevState: any) {
-    if (nextProps.frame !== prevState.frame) {
-      return {
-        frame: nextProps.frame,
-      }
-    }
-    else { return null }
+    this.draw = this.draw.bind(this)
+    this.updateHud = this.updateHud.bind(this)
   }
 
   public componentDidMount() {
-    this.startLoop()
+    this.hudTimer = window.setInterval(this.updateHud, 1000)
   }
 
   public componentWillUnmount() {
-    this.stopLoop()
+    window.clearInterval(this.hudTimer)
+    if (this.drawRequest)
+      window.cancelAnimationFrame(this.drawRequest)
+    this.nextBitmap?.close()
   }
 
-  public startLoop() {
-    if (!this.frameId)
-      this.frameId = window.requestAnimationFrame(this.renderLoop)
+  // Frames bypass React state: decoding happens off the main thread and the canvas is
+  // painted once per animation frame with the newest bitmap
+  public async drawFrame(frame: ScreencastFrame, onDecoded: () => void) {
+    let bitmap: ImageBitmap
+    try {
+      // the image type is sniffed from the bytes, so png and jpeg both work
+      bitmap = await createImageBitmap(new Blob([frame.data]))
+    }
+    finally {
+      onDecoded()
+    }
+
+    if (this.nextBitmap) {
+      this.nextBitmap.close()
+      this.stats.skipped++
+    }
+    this.nextBitmap = bitmap
+    this.nextTimestamp = frame.metadata.timestamp
+    this.stats.hostDropped = frame.droppedFrames
+    if (!this.drawRequest)
+      this.drawRequest = window.requestAnimationFrame(this.draw)
   }
 
-  public stopLoop() {
-    if (this.frameId)
-      window.cancelAnimationFrame(this.frameId)
+  private draw() {
+    this.drawRequest = null
+    const bitmap = this.nextBitmap
+    const canvas = this.canvasRef.current
+    this.nextBitmap = null
+    if (!bitmap)
+      return
+    if (canvas) {
+      if (canvas.width !== bitmap.width || canvas.height !== bitmap.height) {
+        canvas.width = bitmap.width
+        canvas.height = bitmap.height
+      }
+      canvas.getContext('2d')?.drawImage(bitmap, 0, 0)
+      canvas.classList.add('has-frame')
+      this.stats.drawn++
+      if (this.nextTimestamp)
+        this.stats.latency += Date.now() - this.nextTimestamp * 1000
+    }
+    bitmap.close()
   }
 
-  public renderLoop() {
-    this.frameId = window.requestAnimationFrame(this.renderLoop) // Set up next iteration of the loop
+  private updateHud() {
+    const hud = this.hudRef.current
+    const { drawn, skipped, latency, hostDropped, lastHostDropped } = this.stats
+    if (hud) {
+      const heap = (performance as any).memory?.usedJSHeapSize
+      hud.textContent = [
+        `${drawn} fps`,
+        `latency ${drawn ? Math.round(latency / drawn) : '-'} ms`,
+        `dropped ${hostDropped - lastHostDropped + skipped}`,
+        heap ? `heap ${Math.round(heap / 1048576)} MB` : '',
+      ].filter(Boolean).join(' · ')
+    }
+    this.stats = { drawn: 0, skipped: 0, latency: 0, hostDropped, lastHostDropped: hostDropped }
   }
 
   public render() {
     const canvasStyle = {
       cursor: this.props.viewportMetadata?.cursor || 'auto',
+      // only the CSS size: setting the width attribute would clear the canvas
+      width: this.props.width,
     }
-    const base64Data = this.props.frame?.base64Data
-    const format = this.props.format
 
     return (
-      <img
-        className="screencast"
-        // no src until the first frame arrives, otherwise a broken-image icon shows
-        src={base64Data ? `data:image/${format};base64,${base64Data}` : undefined}
-        alt=""
-        ref={this.imageRef}
-        style={canvasStyle}
-        width={this.props.width}
-        draggable="false"
-        onMouseDown={this.handleMouseEvent}
-        onMouseUp={this.handleMouseEvent}
-        onMouseMove={this.handleMouseEvent}
-        onClick={this.handleMouseEvent}
-        onWheel={this.handleMouseEvent}
-        onKeyDown={this.handleKeyEvent}
-        onKeyUp={this.handleKeyEvent}
-        onKeyPress={this.handleKeyEvent}
-        onContextMenu={this.handleContextMenu}
-        tabIndex={0}
-      />
+      <>
+        <canvas
+          className="screencast"
+          ref={this.canvasRef}
+          style={canvasStyle}
+          draggable="false"
+          onMouseDown={this.handleMouseEvent}
+          onMouseUp={this.handleMouseEvent}
+          onMouseMove={this.handleMouseEvent}
+          onClick={this.handleMouseEvent}
+          onWheel={this.handleMouseEvent}
+          onKeyDown={this.handleKeyEvent}
+          onKeyUp={this.handleKeyEvent}
+          onKeyPress={this.handleKeyEvent}
+          onContextMenu={this.handleContextMenu}
+          tabIndex={0}
+        />
+        {this.props.perfHud && <div className="screencast-hud" ref={this.hudRef} />}
+      </>
     )
   }
 
-  private handleContextMenu(event: React.MouseEvent<HTMLImageElement>) {
+  private handleContextMenu(event: React.MouseEvent<HTMLCanvasElement>) {
     event.preventDefault()
   }
 
-  private handleMouseEvent(event: React.MouseEvent<HTMLImageElement>) {
+  private handleMouseEvent(event: React.MouseEvent<HTMLCanvasElement>) {
     event.stopPropagation()
     if (this.props.isInspectEnabled) {
       if (event.type === 'click') {
-        const position = this.convertIntoScreenSpace(event, this.state)
+        const position = this.convertIntoScreenSpace(event)
         this.props.onInspectElement({
           position,
         })
       }
       else if (event.type === 'mousemove') {
-        const position = this.convertIntoScreenSpace(event, this.state)
+        const position = this.convertIntoScreenSpace(event)
         this.props.onInspectHighlightRequested({
           position,
         })
@@ -109,19 +155,19 @@ class Screencast extends React.Component<any, any> {
     }
 
     if (event.type === 'mousemove') {
-      const position = this.convertIntoScreenSpace(event, this.state)
+      const position = this.convertIntoScreenSpace(event)
       this.props.onMouseMoved({
         position,
       })
     }
 
     if (event.type === 'mousedown') {
-      if (this.imageRef.current)
-        this.imageRef.current.focus()
+      if (this.canvasRef.current)
+        this.canvasRef.current.focus()
     }
   }
 
-  private convertIntoScreenSpace(event: any, state: any) {
+  private convertIntoScreenSpace(event: any) {
     const { screenZoom } = this.props.viewportMetadata
 
     return {
@@ -130,7 +176,7 @@ class Screencast extends React.Component<any, any> {
     }
   }
 
-  private handleKeyEvent(event: React.KeyboardEvent<HTMLImageElement>) {
+  private handleKeyEvent(event: React.KeyboardEvent<HTMLCanvasElement>) {
     // Prevents events from penetrating into toolbar input
     event.stopPropagation()
     this.emitKeyEvent(event.nativeEvent)
@@ -140,8 +186,8 @@ class Screencast extends React.Component<any, any> {
     if (event.key === 'Tab' || ((event.ctrlKey || event.metaKey) && event.code === 'KeyA'))
       event.preventDefault()
 
-    if (this.imageRef.current)
-      this.imageRef.current.focus()
+    if (this.canvasRef.current)
+      this.canvasRef.current.focus()
   }
 
   private modifiersForEvent(event: any) {

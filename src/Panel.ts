@@ -74,11 +74,21 @@ export class Panel extends EventEmitter2 {
     )
     this._panel.webview.html = this.contentProvider.getContent(this._panel.webview)
     this._panel.onDidDispose(() => this.dispose(), null, this.disposables)
-    this._panel.onDidChangeViewState(() => this.emit(this._panel.active ? 'focus' : 'blur'), null, this.disposables)
+    this._panel.onDidChangeViewState(() => {
+      this.emit(this._panel.active ? 'focus' : 'blur')
+      // a hidden panel keeps its webview alive: tell it to stop the screencast until it's shown again
+      this._panel.webview.postMessage({ method: 'extension.visibility', result: { visible: this._panel.visible } })
+    }, null, this.disposables)
     this._panel.webview.onDidReceiveMessage(
       (msg) => {
+        if (msg.type === 'extension.frameDrawn') {
+          this.browserPage?.frameDrawn()
+          return
+        }
+
         // sent whenever the webview (re)loads, e.g. after being moved to another window
         if (msg.type === 'extension.ready') {
+          this.browserPage?.frameDrawn()
           this.sendConfiguration()
           this.emit('ready')
           return
@@ -180,10 +190,15 @@ export class Panel extends EventEmitter2 {
   }
 
   private sendConfiguration() {
+    const engine = this.browser.engine
+    const result: ExtensionConfiguration = {
+      ...this.config,
+      engineEndpoint: engine && this.browserPage ? { ...engine.endpoint, targetId: this.browserPage.id } : undefined,
+    }
     this._panel?.webview.postMessage({
       method: 'extension.appConfiguration',
       result: {
-        ...this.config,
+        ...result,
         isDebug: this.isDebugPage,
         // only navigate on the first load; a reloaded webview keeps the current page
         startUrl: this.configured ? undefined : this.initialUrl,

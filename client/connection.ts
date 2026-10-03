@@ -21,6 +21,23 @@ export default class Connection extends EventEmitter2 {
 
     this.logger.log('SEND ► ', method, params)
 
+    this.post({
+      callbackId: id,
+      params,
+      type: method,
+    })
+
+    return new Promise((resolve, reject) => {
+      this.callbacks.set(id, { resolve, reject, error: new Error('Unknown'), method })
+    })
+  }
+
+  // for messages nobody replies to: send() would keep a callback for each of them forever
+  notify(method: string, params = {}) {
+    this.post({ params, type: method })
+  }
+
+  private post(message: object) {
     if (!this.vscode) {
       try {
         // @ts-expect-error
@@ -31,17 +48,7 @@ export default class Connection extends EventEmitter2 {
       }
     }
 
-    if (this.vscode) {
-      this.vscode.postMessage({
-        callbackId: id,
-        params,
-        type: method,
-      })
-    }
-
-    return new Promise((resolve, reject) => {
-      this.callbacks.set(id, { resolve, reject, error: new Error('Unknown'), method })
-    })
+    this.vscode?.postMessage(message)
   }
 
   onMessage(message: any) {
