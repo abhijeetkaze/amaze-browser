@@ -48,6 +48,21 @@
       },
       {
         "category": "Amaze Browser",
+        "command": "amaze-browser.newTab",
+        "title": "New Tab"
+      },
+      {
+        "category": "Amaze Browser",
+        "command": "amaze-browser.showHistory",
+        "title": "Show History"
+      },
+      {
+        "category": "Amaze Browser",
+        "command": "amaze-browser.clearBrowsingData",
+        "title": "Clear History and Cookies"
+      },
+      {
+        "category": "Amaze Browser",
         "command": "amaze-browser.openActiveFile",
         "title": "Open Active File in Preview"
       },
@@ -80,6 +95,11 @@
         },
         "amaze-browser.chromeExecutable": {
           "description": "The full path to the executable, including the complete filename of the executable. When empty on Linux, Amaze Browser downloads and uses its own Chromium build.",
+          "type": "string"
+        },
+        "amaze-browser.downloadPath": {
+          "default": "",
+          "description": "Folder where downloaded files are saved. Leave empty to use ~/Downloads.",
           "type": "string"
         },
         "amaze-browser.verbose": {

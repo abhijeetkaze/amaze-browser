@@ -63,7 +63,9 @@ class Screencast extends React.Component<any, any> {
     return (
       <img
         className="screencast"
-        src={`data:image/${format};base64,${base64Data}`}
+        // no src until the first frame arrives, otherwise a broken-image icon shows
+        src={base64Data ? `data:image/${format};base64,${base64Data}` : undefined}
+        alt=""
         ref={this.imageRef}
         style={canvasStyle}
         width={this.props.width}

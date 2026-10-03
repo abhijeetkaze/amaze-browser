@@ -1,10 +1,32 @@
+/* Design tokens, mapped onto the VS Code theme so light, dark and high-contrast themes all work */
+:root {
+  --ab-font: var(--vscode-font-family, system-ui, sans-serif);
+  --ab-fg: var(--vscode-foreground, #cccccc);
+  --ab-muted: var(--vscode-descriptionForeground, #9d9d9d);
+  --ab-toolbar-bg: var(--vscode-tab-activeBackground, var(--vscode-editor-background, #1e1e1e));
+  --ab-page-bg: var(--vscode-editor-background, #1e1e1e);
+  --ab-border: var(--vscode-editorGroup-border, rgba(128, 128, 128, 0.25));
+  --ab-field-bg: var(--vscode-input-background, rgba(128, 128, 128, 0.12));
+  --ab-field-border: var(--vscode-input-border, transparent);
+  --ab-hover: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.16));
+  --ab-pressed: var(--vscode-toolbar-activeBackground, rgba(128, 128, 128, 0.26));
+  --ab-focus: var(--vscode-focusBorder, #8b5cf6);
+  --ab-brand: linear-gradient(90deg, #8b5cf6, #22d3ee);
+  --ab-radius: 6px;
+  --ab-radius-pill: 999px;
+  --ab-duration: 120ms;
+}
+
 html,
 body {
   height: 100%;
   margin: 0;
   padding: 0;
-  font-size: 14px;
+  font-family: var(--ab-font);
+  font-size: 13px;
   font-weight: 400;
+  color: var(--ab-fg);
+  background: var(--ab-page-bg);
   overflow: hidden;
 }
 
@@ -17,4 +39,13 @@ body {
   height: 100%;
   display: flex;
   flex-direction: column;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+  }
 }

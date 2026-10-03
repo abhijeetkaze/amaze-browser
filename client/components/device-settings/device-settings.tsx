@@ -60,7 +60,7 @@ class DeviceSettings extends React.Component<any, any> {
 
     return (
       <div className={`device-settings ${this.props.isVisible ? 'active' : ''}`}>
-        <select className="device-selector" onChange={this.handleDeviceChange} value={selectedDevice}>
+        <select className="device-selector" aria-label="Device" onChange={this.handleDeviceChange} value={selectedDevice}>
           {this.emulatedDevices.map((device: any) => {
             return (
               <option key={device.name} value={device.name} selected={device.selected}>
@@ -73,14 +73,16 @@ class DeviceSettings extends React.Component<any, any> {
         <span className="metadata">
           <input
             className="viewport-size-input"
+            aria-label="Width"
             type="number"
             min="0"
             value={viewportWidth}
             onChange={this.handleWidthChange}
           />
-          <span className="spacer">𝗑</span>
+          <span className="spacer" aria-hidden="true">×</span>
           <input
             className="viewport-size-input"
+            aria-label="Height"
             type="number"
             min="0"
             value={viewportHeight}
@@ -88,7 +90,7 @@ class DeviceSettings extends React.Component<any, any> {
           />
         </span>
 
-        <select className="device-selector" value="fit">
+        <select className="device-selector" aria-label="Zoom" value="fit">
           {zoomLevels.map((level: any) => {
             return (
               <option key={level.value} value={level.value}>

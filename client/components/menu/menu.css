@@ -1,4 +1,4 @@
-.page-context-menu {
+.menu {
   position: fixed;
   z-index: 1200;
   min-width: 220px;
@@ -12,12 +12,12 @@
   color: var(--vscode-menu-foreground, #cccccc);
   background: var(--vscode-menu-background, #252526);
   border: 1px solid var(--vscode-menu-border, transparent);
-  border-radius: 6px;
-  box-shadow: 0 2px 8px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.36));
+  border-radius: 8px;
+  box-shadow: 0 8px 24px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.36));
   user-select: none;
 }
 
-.page-context-menu-item {
+.menu-item {
   display: flex;
   justify-content: space-between;
   gap: 24px;
@@ -28,26 +28,26 @@
   white-space: nowrap;
 }
 
-.page-context-menu-item .label {
+.menu-item .label {
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.page-context-menu-item .shortcut {
+.menu-item .hint {
   opacity: 0.7;
 }
 
-.page-context-menu-item:hover {
+.menu-item:hover {
   color: var(--vscode-menu-selectionForeground, #ffffff);
   background: var(--vscode-menu-selectionBackground, #04395e);
 }
 
-.page-context-menu-item.disabled {
+.menu-item.disabled {
   opacity: 0.4;
   pointer-events: none;
 }
 
-.page-context-menu-separator {
+.menu-separator {
   height: 1px;
   margin: 4px 0;
   background: var(--vscode-menu-separatorBackground, #454545);

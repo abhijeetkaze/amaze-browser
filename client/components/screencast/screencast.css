@@ -1,3 +1,7 @@
+img.screencast:not([src]) {
+  visibility: hidden;
+}
+
 img.screencast {
   -webkit-backface-visibility: hidden;
   -webkit-transform: translateZ(0); /* Chrome, Safari, Opera */

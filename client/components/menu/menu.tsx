@@ -1,39 +1,44 @@
 import React from 'react'
-import type { ContextMenuInfo } from '../../../src/ContextMenuInfo'
-import './page-contextmenu.css'
+import './menu.css'
 
-export interface PageContextMenuItem {
+export interface MenuItem {
   label: string
-  shortcut?: string
+  // secondary text on the right, e.g. a keyboard shortcut
+  hint?: string
+  // tooltip, e.g. the full URL of a truncated label
+  title?: string
   disabled?: boolean
   action?: () => void
 }
 
 // null renders a separator
-export type PageContextMenuEntry = PageContextMenuItem | null
+export type MenuEntry = MenuItem | null
 
-export interface PageContextMenuState {
-  info: ContextMenuInfo
-  position: { x: number, y: number }
+export interface MenuPosition {
+  x: number
+  y: number
 }
 
 interface IProps {
-  menu: PageContextMenuState | null
-  items: PageContextMenuEntry[]
+  // where to open the menu, null when closed
+  position: MenuPosition | null
+  items: MenuEntry[]
   onClose: () => void
+  // elements whose clicks shouldn't close the menu (e.g. the button that toggles it)
+  ignoreClicksOn?: React.RefObject<HTMLElement>
 }
 
 interface IState {
   // position after keeping the menu inside the window
-  position: { x: number, y: number } | null
+  fitted: MenuPosition | null
 }
 
-class PageContextMenu extends React.Component<IProps, IState> {
+class Menu extends React.Component<IProps, IState> {
   private ref = React.createRef<HTMLUListElement>()
 
   constructor(props: IProps) {
     super(props)
-    this.state = { position: null }
+    this.state = { fitted: null }
     this.handleOutsideMouseDown = this.handleOutsideMouseDown.bind(this)
     this.handleKeyDown = this.handleKeyDown.bind(this)
   }
@@ -51,39 +56,41 @@ class PageContextMenu extends React.Component<IProps, IState> {
   }
 
   componentDidUpdate(prevProps: IProps) {
-    if (prevProps.menu !== this.props.menu)
+    if (prevProps.position !== this.props.position)
       this.fitIntoWindow()
   }
 
   private fitIntoWindow() {
-    const menu = this.props.menu
+    const position = this.props.position
     const el = this.ref.current
-    if (!menu || !el) {
-      this.setState({ position: null })
+    if (!position || !el) {
+      this.setState({ fitted: null })
       return
     }
     const { width, height } = el.getBoundingClientRect()
-    let { x, y } = menu.position
+    let { x, y } = position
     if (x + width > window.innerWidth)
       x = Math.max(0, x - width)
     if (y + height > window.innerHeight)
       y = Math.max(0, window.innerHeight - height)
-    this.setState({ position: { x, y } })
+    this.setState({ fitted: { x, y } })
   }
 
   private handleOutsideMouseDown(e: MouseEvent) {
-    if (this.props.menu && !this.ref.current?.contains(e.target as Node))
-      this.props.onClose()
+    const target = e.target as Node
+    if (!this.props.position || this.ref.current?.contains(target) || this.props.ignoreClicksOn?.current?.contains(target))
+      return
+    this.props.onClose()
   }
 
   private handleKeyDown(e: KeyboardEvent) {
-    if (this.props.menu && e.key === 'Escape') {
+    if (this.props.position && e.key === 'Escape') {
       e.stopPropagation()
       this.props.onClose()
     }
   }
 
-  private handleClick(item: PageContextMenuItem) {
+  private handleClick(item: MenuItem) {
     if (item.disabled)
       return
     this.props.onClose()
@@ -91,36 +98,39 @@ class PageContextMenu extends React.Component<IProps, IState> {
   }
 
   public render() {
-    const { menu, items } = this.props
-    if (!menu)
+    const { position, items } = this.props
+    if (!position)
       return null
 
-    const position = this.state.position || menu.position
+    const { x, y } = this.state.fitted || position
     const style = {
-      left: position.x,
-      top: position.y,
+      left: x,
+      top: y,
       // hide until positioned to avoid flickering at the wrong spot
-      visibility: this.state.position ? 'visible' : 'hidden',
+      visibility: this.state.fitted ? 'visible' : 'hidden',
     } as const
 
     return (
-      <ul className="page-context-menu" style={style} ref={this.ref} onContextMenu={e => e.preventDefault()}>
+      <ul className="menu" role="menu" style={style} ref={this.ref} onContextMenu={e => e.preventDefault()}>
         {items.map((item, index) => item
           ? (
             <li
               key={index}
-              className={`page-context-menu-item ${item.disabled ? 'disabled' : ''}`}
+              role="menuitem"
+              aria-disabled={item.disabled}
+              title={item.title}
+              className={`menu-item ${item.disabled ? 'disabled' : ''}`}
               onClick={() => this.handleClick(item)}
             >
               <span className="label">{item.label}</span>
-              {item.shortcut && <span className="shortcut">{item.shortcut}</span>}
+              {item.hint && <span className="hint">{item.hint}</span>}
             </li>
             )
-          : <li key={index} className="page-context-menu-separator" />,
+          : <li key={index} role="separator" className="menu-separator" />,
         )}
       </ul>
     )
   }
 }
 
-export default PageContextMenu
+export default Menu

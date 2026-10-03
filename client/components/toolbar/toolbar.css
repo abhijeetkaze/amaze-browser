@@ -1,48 +1,62 @@
 .toolbar {
-  background: var(--vscode-tab-activeBackground);
-  padding: 6px 6px 5px 6px;
-  border-bottom: 1px solid var(--vscode-tab-border);
-  box-shadow: -1px 1px 2px rgba(0, 0, 0, 0.1);
+  position: relative;
+  z-index: 10;
+  background: var(--ab-toolbar-bg);
+  border-bottom: 1px solid var(--ab-border);
 }
 
-.inner {
+.toolbar-row {
   display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 8px;
 }
 
-button {
-  cursor: pointer !important;
-  background: transparent;
-  transition: background-color 0.2s ease-in-out;
-  padding: 0 5px;
-  color: var(--vscode-tab-activeForeground);
-  outline: none;
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 16px;
+  margin: 0 4px;
+  background: var(--ab-border);
+}
+
+.toolbar-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
   border: none;
-  font-size: 21px;
-  border-radius: 2px;
+  border-radius: var(--ab-radius);
+  background: transparent;
+  color: var(--ab-fg);
   cursor: pointer;
-
-  height: 29px;
-  width: 29px;
+  transition: background-color var(--ab-duration) ease-out, opacity var(--ab-duration) ease-out;
 }
 
-button svg {
-  display: block;
-  font-size: 0.85em;
+.toolbar-button:hover:not(:disabled) {
+  background: var(--ab-hover);
 }
 
-button:not([disabled]):active:hover {
-  background-color: var(--vscode-button-secondaryBackground);
+.toolbar-button:active:not(:disabled),
+.toolbar-button.active {
+  background: var(--ab-pressed);
 }
 
-button:not([disabled]):hover,
-button:not([disabled]):active {
-  background-color: var(--vscode-button-secondaryBackground);
+.toolbar-button:focus-visible {
+  outline: 1px solid var(--ab-focus);
+  outline-offset: -1px;
 }
 
-button:disabled {
-  opacity: 0.1;
-}
-
-button.active {
-  background-color: var(--vscode-button-secondaryBackground);
+.toolbar-button:disabled {
+  opacity: 0.35;
+  cursor: default;
 }

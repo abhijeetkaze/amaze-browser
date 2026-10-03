@@ -6,6 +6,7 @@ import { EventEmitter2 } from 'eventemitter2'
 import type { BrowserClient } from './BrowserClient'
 import type { BrowserPage } from './BrowserPage'
 import type { ExtensionConfiguration } from './ExtensionConfiguration'
+import type { HistoryEntry } from './HistoryEntry'
 import { ContentProvider } from './ContentProvider'
 
 export class Panel extends EventEmitter2 {
@@ -75,6 +76,8 @@ export class Panel extends EventEmitter2 {
           this.title = msg.params.title
           if (this._panel) {
             this._panel.title = this.isDebugPage ? `DevTools - ${this.parentPanel.title}` : msg.params.title
+            if (!this.isDebugPage && this.browserPage)
+              this.emit('pageVisited', { url: this.browserPage.page.url(), title: msg.params.title })
             try {
               this._panel.iconPath = Uri.parse(`https://favicon.yandex.net/favicon/${new URL(this.browserPage?.page.url() || '').hostname}`)
             }
@@ -88,6 +91,12 @@ export class Panel extends EventEmitter2 {
         }
         if (msg.type === 'extension.openFile')
           this.handleOpenFileRequest(msg.params)
+
+        if (msg.type === 'extension.newTab')
+          this.emit('newTabRequested')
+
+        if (msg.type === 'extension.clearBrowsingData')
+          this.emit('clearBrowsingDataRequested')
 
         if (msg.type === 'extension.openExternal')
           env.openExternal(Uri.parse(msg.params.url))
@@ -222,6 +231,13 @@ export class Panel extends EventEmitter2 {
       if (close)
         this.dispose()
     }
+  }
+
+  public postHistory(entries: HistoryEntry[]) {
+    this._panel?.webview.postMessage({
+      method: 'extension.history',
+      result: entries,
+    })
   }
 
   public setViewport(viewport: any) {

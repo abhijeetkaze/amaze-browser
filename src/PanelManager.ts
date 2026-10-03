@@ -1,8 +1,9 @@
 import type { ExtensionContext, Uri } from 'vscode'
-import { commands, workspace } from 'vscode'
+import { commands, window, workspace } from 'vscode'
 import * as EventEmitter from 'eventemitter2'
 
-import { BrowserClient } from './BrowserClient'
+import { BrowserClient, clearSavedCookies } from './BrowserClient'
+import { History } from './History'
 import { getConfig, getConfigs } from './Config'
 import { Panel } from './Panel'
 import type { ExtensionConfiguration } from './ExtensionConfiguration'
@@ -12,11 +13,14 @@ export class PanelManager extends EventEmitter.EventEmitter2 {
   public current: Panel | undefined
   public browser: BrowserClient
   public config: ExtensionConfiguration
+  public readonly history: History
 
   constructor(public readonly ctx: ExtensionContext) {
     super()
     this.panels = new Set()
     this.config = getConfigs(this.ctx)
+    this.history = new History(ctx.globalState)
+    this.history.on('changed', entries => this.panels.forEach(p => p.postHistory(entries)))
 
     this.on('windowOpenRequested', (params) => {
       this.create(params.url)
@@ -58,6 +62,10 @@ export class PanelManager extends EventEmitter.EventEmitter2 {
       this.emit('windowOpenRequested', params)
     })
 
+    panel.on('newTabRequested', () => this.create())
+    panel.on('clearBrowsingDataRequested', () => this.clearBrowsingData())
+    panel.on('pageVisited', ({ url, title }) => this.history.add(url, title))
+
     panel.on('focus', () => {
       this.current = panel
       commands.executeCommand('setContext', 'amaze-browser-active', true)
@@ -73,6 +81,7 @@ export class PanelManager extends EventEmitter.EventEmitter2 {
     this.panels.add(panel)
 
     await panel.launch(startUrl.toString())
+    panel.postHistory(this.history.list())
 
     this.emit('windowCreated', panel)
 
@@ -97,6 +106,49 @@ export class PanelManager extends EventEmitter.EventEmitter2 {
       )
     }
     return panel
+  }
+
+  public async showHistory() {
+    const entries = this.history.list()
+    const clearItem = { label: '$(trash) Clear History and Cookies...', url: '' }
+    const picked = await window.showQuickPick(
+      [
+        ...entries.map(e => ({ label: e.title || e.url, description: e.title ? e.url : undefined, url: e.url })),
+        clearItem,
+      ],
+      { placeHolder: entries.length ? 'Recently visited pages' : 'No history yet' },
+    )
+    if (!picked)
+      return
+    if (picked === clearItem)
+      return this.clearBrowsingData()
+    if (this.current)
+      this.current.navigateTo(picked.url)
+    else
+      await this.create(picked.url)
+  }
+
+  public async clearBrowsingData() {
+    const confirm = 'Clear'
+    const answer = await window.showWarningMessage(
+      'Delete all browsing history and cookies?',
+      { modal: true, detail: 'You will be signed out of websites opened in Amaze Browser.' },
+      confirm,
+    )
+    if (answer !== confirm)
+      return
+
+    try {
+      await this.history.clear()
+      if (this.browser)
+        await this.browser.clearCookies()
+      else
+        await clearSavedCookies(this.ctx)
+      window.showInformationMessage('Amaze Browser: History and cookies cleared.')
+    }
+    catch (e) {
+      window.showErrorMessage(`Amaze Browser: Failed to clear cookies: ${e instanceof Error ? e.message : e}`)
+    }
   }
 
   public disposeByUrl(url: string) {

@@ -3,35 +3,18 @@ import './toolbar.css'
 
 import UrlInput from '../url-input/url-input'
 import DeviceSettings from '../device-settings/device-settings'
+import Menu from '../menu/menu'
+import type { MenuEntry, MenuPosition } from '../menu/menu'
+import type { HistoryEntry } from '../../../src/HistoryEntry'
+import { ArrowLeftIcon, ArrowRightIcon, DeviceIcon, HistoryIcon, PlusIcon, ReloadIcon, StopIcon } from '../icons/icons'
 
-export function CarbonArrowLeft(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg width="1em" height="1em" viewBox="0 0 32 32" {...props}><path d="M14 26l1.41-1.41L7.83 17H28v-2H7.83l7.58-7.59L14 6L4 16l10 10z" fill="currentColor"></path></svg>
-  )
-}
-
-export function CarbonArrowRight(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg width="1em" height="1em" viewBox="0 0 32 32" {...props}><path d="M18 6l-1.43 1.393L24.15 15H4v2h20.15l-7.58 7.573L18 26l10-10L18 6z" fill="currentColor"></path></svg>
-  )
-}
-
-export function CarbonRenew(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg width="1em" height="1em" viewBox="0 0 32 32" {...props}>
-      <path d="M12 10H6.78A11 11 0 0 1 27 16h2A13 13 0 0 0 6 7.68V4H4v8h8z" fill="currentColor"></path>
-      <path d="M20 22h5.22A11 11 0 0 1 5 16H3a13 13 0 0 0 23 8.32V28h2v-8h-8z" fill="currentColor"></path>
-    </svg>
-  )
-}
-
-export function CarbonDevices(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg width="1em" height="1em" viewBox="0 0 32 32" {...props}>
-      <path d="M10 30H4a2 2 0 0 1-2-2V16a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2zM4 16v12h6V16z" fill="currentColor"></path>
-      <path d="M28 4H6a2 2 0 0 0-2 2v6h2V6h22v14H14v2h2v4h-2v2h9v-2h-5v-4h10a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z" fill="currentColor"></path>
-    </svg>
-  )
+function hostname(url: string) {
+  try {
+    return new URL(url).hostname || url
+  }
+  catch {
+    return url
+  }
 }
 
 interface IToolbarProps {
@@ -41,14 +24,23 @@ interface IToolbarProps {
   isDeviceEmulationEnabled: boolean
   url: string
   viewport: any
+  visitedPages: HistoryEntry[]
+  // floating panel shown under the toolbar, e.g. the find bar
+  overlay?: React.ReactNode
   onActionInvoked: (action: string, data?: object) => Promise<any>
 }
 
-class Toolbar extends React.Component<IToolbarProps, any> {
+interface IToolbarState {
+  historyMenuPosition: MenuPosition | null
+}
+
+class Toolbar extends React.Component<IToolbarProps, IToolbarState> {
   private viewportMetadata: any
+  private historyButtonRef = React.createRef<HTMLButtonElement>()
 
   constructor(props: any) {
     super(props)
+    this.state = { historyMenuPosition: null }
 
     this.handleBack = this.handleBack.bind(this)
     this.handleForward = this.handleForward.bind(this)
@@ -58,54 +50,91 @@ class Toolbar extends React.Component<IToolbarProps, any> {
     this.handleEmulateDevice = this.handleEmulateDevice.bind(this)
     this.handleDeviceChange = this.handleDeviceChange.bind(this)
     this.handleViewportSizeChange = this.handleViewportSizeChange.bind(this)
+    this.toggleHistoryMenu = this.toggleHistoryMenu.bind(this)
+    this.closeHistoryMenu = this.closeHistoryMenu.bind(this)
   }
 
   public render() {
     this.viewportMetadata = this.props.viewport
 
+    // canGoBack/canGoForward are true when navigation in that direction is NOT possible
+    const isLoading = !!this.viewportMetadata?.isLoading
+
     return (
       <div className="toolbar">
-        <div className="inner">
-          {/* <button
-            className={`inspect ${this.props.isInspectEnabled ? 'active' : ''}`}
-            style={iconInspectStyle}
-            onClick={this.handleInspect}
-          >
-            Inspect
-          </button> */}
-          <button
-            className="backward"
-            onClick={this.handleBack}
-            disabled={this.props.canGoBack}
-          >
-            <CarbonArrowLeft />
-          </button>
-          <button
-            className="forward"
-            onClick={this.handleForward}
-            disabled={this.props.canGoForward}
-          >
-            <CarbonArrowRight />
-          </button>
-          <button
-            className="refresh"
-            onClick={this.handleRefresh}
-          >
-            <CarbonRenew />
-          </button>
+        <div className="toolbar-row">
+          <div className="toolbar-group">
+            <button
+              className="toolbar-button"
+              title="Back"
+              aria-label="Back"
+              onClick={this.handleBack}
+              disabled={this.props.canGoBack}
+            >
+              <ArrowLeftIcon />
+            </button>
+            <button
+              className="toolbar-button"
+              title="Forward"
+              aria-label="Forward"
+              onClick={this.handleForward}
+              disabled={this.props.canGoForward}
+            >
+              <ArrowRightIcon />
+            </button>
+            <button
+              className="toolbar-button"
+              title={isLoading ? 'Stop loading' : 'Reload'}
+              aria-label={isLoading ? 'Stop loading' : 'Reload'}
+              onClick={isLoading ? () => this.props.onActionInvoked('stop') : this.handleRefresh}
+            >
+              {isLoading ? <StopIcon /> : <ReloadIcon />}
+            </button>
+          </div>
           <UrlInput
             url={this.props.url}
             onUrlChanged={this.handleUrlChange}
             onActionInvoked={this.props.onActionInvoked}
           />
-          <button
-            className={`device ${this.props.isDeviceEmulationEnabled ? 'active' : ''}`}
-            title="Emulate device"
-            onClick={this.handleEmulateDevice}
-          >
-            <CarbonDevices />
-          </button>
+          <div className="toolbar-group">
+            <button
+              className={`toolbar-button ${this.state.historyMenuPosition ? 'active' : ''}`}
+              title="History"
+              aria-label="History"
+              aria-haspopup="menu"
+              aria-expanded={!!this.state.historyMenuPosition}
+              ref={this.historyButtonRef}
+              onClick={this.toggleHistoryMenu}
+            >
+              <HistoryIcon />
+            </button>
+            <button
+              className={`toolbar-button ${this.props.isDeviceEmulationEnabled ? 'active' : ''}`}
+              title="Emulate device"
+              aria-label="Emulate device"
+              aria-pressed={this.props.isDeviceEmulationEnabled}
+              onClick={this.handleEmulateDevice}
+            >
+              <DeviceIcon />
+            </button>
+            <span className="toolbar-divider" aria-hidden="true" />
+            <button
+              className="toolbar-button"
+              title="New tab"
+              aria-label="New tab"
+              onClick={() => this.props.onActionInvoked('newTab')}
+            >
+              <PlusIcon />
+            </button>
+          </div>
         </div>
+        <Menu
+          position={this.state.historyMenuPosition}
+          items={this.getHistoryMenuItems()}
+          onClose={this.closeHistoryMenu}
+          ignoreClicksOn={this.historyButtonRef}
+        />
+        {this.props.overlay}
         <DeviceSettings
           viewportMetadata={this.viewportMetadata}
           isVisible={this.props.isDeviceEmulationEnabled}
@@ -114,6 +143,38 @@ class Toolbar extends React.Component<IToolbarProps, any> {
         />
       </div>
     )
+  }
+
+  private toggleHistoryMenu() {
+    if (this.state.historyMenuPosition) {
+      this.closeHistoryMenu()
+      return
+    }
+    const rect = this.historyButtonRef.current!.getBoundingClientRect()
+    // anchored at the button's right edge; the menu flips left when it doesn't fit
+    this.setState({ historyMenuPosition: { x: rect.right, y: rect.bottom + 4 } })
+  }
+
+  private closeHistoryMenu() {
+    this.setState({ historyMenuPosition: null })
+  }
+
+  private getHistoryMenuItems(): MenuEntry[] {
+    const pages = this.props.visitedPages
+    const items: MenuEntry[] = pages.length
+      ? pages.map(page => ({
+        label: page.title || hostname(page.url),
+        hint: page.title ? hostname(page.url) : undefined,
+        title: page.url,
+        action: () => this.handleUrlChange(page.url),
+      }))
+      : [{ label: 'No history yet', disabled: true }]
+
+    return [
+      ...items,
+      null,
+      { label: 'Clear History and Cookies...', action: () => this.props.onActionInvoked('clearBrowsingData') },
+    ]
   }
 
   private handleUrlChange(url: string) {

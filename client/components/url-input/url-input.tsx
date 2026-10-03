@@ -1,7 +1,31 @@
 import React from 'react'
 import ContextMenu from '../contextmenu/contextmenu'
 import type { IContextMenuProps } from '../contextmenu/contextmenu-models'
+import { FileIcon, GlobeIcon, LockIcon, SearchIcon } from '../icons/icons'
 import './url-input.css'
+
+// Splits a URL for display: the host is emphasized and the scheme of web pages is hidden
+function formatUrl(url: string) {
+  try {
+    const u = new URL(url)
+    if (u.protocol === 'https:' || u.protocol === 'http:') {
+      const rest = `${u.pathname === '/' ? '' : u.pathname}${u.search}${u.hash}`
+      return { host: u.host, rest }
+    }
+  }
+  catch {}
+  return { host: '', rest: url }
+}
+
+function securityOf(url: string) {
+  if (url.startsWith('https:'))
+    return { Icon: LockIcon, label: 'Secure connection', kind: 'secure' }
+  if (url.startsWith('http:'))
+    return { Icon: GlobeIcon, label: 'Connection is not encrypted', kind: 'plain' }
+  if (url.startsWith('file:'))
+    return { Icon: FileIcon, label: 'Local file', kind: 'file' }
+  return { Icon: SearchIcon, label: 'Address', kind: 'empty' }
+}
 
 interface IUrlInputState {
   isFocused: boolean
@@ -104,21 +128,38 @@ class UrlInput extends React.Component<any, IUrlInputState> {
   }
 
   public render() {
+    const url = this.state.url === 'about:blank' ? '' : this.state.url
+    const showFormatted = !this.state.isFocused && !this.state.hasChanged && !!url
+    const { host, rest } = formatUrl(url)
+    const security = securityOf(this.state.hasChanged ? '' : url)
+
     return (
-      <>
+      <div className={`omnibox ${this.state.isFocused ? 'focused' : ''}`}>
+        <span className={`omnibox-security ${security.kind}`} title={security.label} aria-label={security.label} role="img">
+          <security.Icon width={14} height={14} />
+        </span>
         <input
-          className="urlbar"
+          className={`urlbar ${showFormatted ? 'formatted' : ''}`}
           type="text"
+          aria-label="Address"
+          placeholder="Enter a URL"
+          spellCheck={false}
           ref={this.setRef}
-          value={this.state.url}
+          value={url}
           onFocus={this.handleFocus}
           onBlur={this.handleBlur}
           onChange={this.handleChange}
           onKeyDown={this.handleKeyDown}
           onContextMenu={this.handleContextMenu}
         />
+        {showFormatted && (
+          <div className="omnibox-display" aria-hidden="true">
+            <span className="host">{host}</span>
+            <span className="rest">{rest}</span>
+          </div>
+        )}
         <ContextMenu {...this.state.contextMenuProps} />
-      </>
+      </div>
     )
   }
 
@@ -190,9 +231,13 @@ class UrlInput extends React.Component<any, IUrlInputState> {
   }
 
   private handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.keyCode === 13) {
-      // Enter
+    if (e.key === 'Enter') {
       this.enterUrl()
+      this.ref?.blur()
+    }
+    else if (e.key === 'Escape') {
+      this.setState({ url: this.props.url, hasChanged: false })
+      this.ref?.blur()
     }
   }
 }

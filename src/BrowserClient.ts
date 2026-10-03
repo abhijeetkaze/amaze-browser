@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events'
 import { platform } from 'os'
 import { existsSync } from 'fs'
+import { rm } from 'fs/promises'
 import { join } from 'path'
 import edge from '@chiragrupani/karma-chromium-edge-launcher'
 import chrome from 'karma-chrome-launcher'
@@ -12,6 +13,18 @@ import type { ExtensionConfiguration } from './ExtensionConfiguration'
 import { tryPort } from './Config'
 import { BrowserPage } from './BrowserPage'
 import { ensureChromium } from './ChromiumDownloader'
+import { Downloads } from './Downloads'
+
+export function getUserDataDir(ctx: ExtensionContext) {
+  return join(ctx.globalStorageUri.fsPath, 'UserData')
+}
+
+// Deletes the cookies of the saved profile; only safe while the browser isn't running
+export async function clearSavedCookies(ctx: ExtensionContext) {
+  // Chromium keeps cookies in Default/Network/Cookies (older versions: Default/Cookies)
+  const files = ['Network/Cookies', 'Network/Cookies-journal', 'Cookies', 'Cookies-journal']
+  await Promise.all(files.map(f => rm(join(getUserDataDir(ctx), 'Default', f), { force: true })))
+}
 
 export class BrowserClient extends EventEmitter {
   private browser: Browser
@@ -58,7 +71,7 @@ export class BrowserClient extends EventEmitter {
 
     let userDataDir
     if (this.config.storeUserData)
-      userDataDir = join(this.ctx.globalStorageUri.fsPath, 'UserData')
+      userDataDir = getUserDataDir(this.ctx)
 
     this.browser = await puppeteer.launch({
       executablePath: chromePath,
@@ -67,6 +80,9 @@ export class BrowserClient extends EventEmitter {
       ignoreDefaultArgs: ['--mute-audio'],
       userDataDir,
     })
+
+    await new Downloads(await this.browser.target().createCDPSession()).enable()
+      .catch(e => window.showWarningMessage(`Amaze Browser: Downloads are disabled: ${e instanceof Error ? e.message : e}`))
 
     // close the initial empty page
     ; (await this.browser.pages()).map(i => i.close())
@@ -94,6 +110,24 @@ export class BrowserClient extends EventEmitter {
     finally {
       session.detach()
     }
+  }
+
+  /**
+   * Deletes all cookies: through the running browser when there is one,
+   * otherwise from the profile saved on disk.
+   */
+  public async clearCookies() {
+    if (this.browser) {
+      const session = await this.browser.target().createCDPSession()
+      try {
+        await session.send('Storage.clearCookies', {})
+      }
+      finally {
+        await session.detach()
+      }
+      return
+    }
+    await clearSavedCookies(this.ctx)
   }
 
   public dispose(): Promise<void> {

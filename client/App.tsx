@@ -4,10 +4,14 @@ import './App.css'
 import { resolve as getElementSourceMetadata } from 'element-to-source'
 import type { ExtensionConfiguration } from '../src/ExtensionConfiguration'
 import type { ContextMenuInfo } from '../src/ContextMenuInfo'
+import type { HistoryEntry } from '../src/HistoryEntry'
 import Toolbar from './components/toolbar/toolbar'
 import Viewport from './components/viewport/viewport'
-import PageContextMenu from './components/page-contextmenu/page-contextmenu'
-import type { PageContextMenuEntry, PageContextMenuState } from './components/page-contextmenu/page-contextmenu'
+import Menu from './components/menu/menu'
+import FindBar from './components/find-bar/find-bar'
+import type { FindResult } from './utils/findInPage'
+import { clearFindExpression, findExpression } from './utils/findInPage'
+import type { MenuEntry, MenuPosition } from './components/menu/menu'
 import Connection from './connection'
 import { CDPHelper } from './utils/cdpHelper'
 
@@ -29,7 +33,10 @@ interface IState {
   isVerboseMode: boolean
   isInspectEnabled: boolean
   isDeviceEmulationEnabled: boolean
-  pageContextMenu: PageContextMenuState | null
+  pageContextMenu: { info: ContextMenuInfo, position: MenuPosition } | null
+  visitedPages: HistoryEntry[]
+  isFindOpen: boolean
+  findResult: FindResult | null
   viewportMetadata: IViewport
   history: {
     canGoBack: boolean
@@ -63,6 +70,7 @@ class App extends React.Component<any, IState> {
   private viewport: Viewport = undefined!
   private cdpHelper: CDPHelper
   private nextViewportSize: { width: number; height: number } | undefined
+  private findBar: FindBar | null = null
   private lastContextMenuPosition: { x: number, y: number } | null = null
   private readonly isMac = /macintosh|mac os x/i.test(navigator.userAgent)
 
@@ -80,6 +88,9 @@ class App extends React.Component<any, IState> {
       isInspectEnabled: false,
       isDeviceEmulationEnabled: false,
       pageContextMenu: null,
+      visitedPages: [],
+      isFindOpen: false,
+      findResult: null,
       history: {
         canGoBack: false,
         canGoForward: false,
@@ -107,6 +118,21 @@ class App extends React.Component<any, IState> {
     this.onToolbarActionInvoked = this.onToolbarActionInvoked.bind(this)
     this.onViewportChanged = this.onViewportChanged.bind(this)
     this.closePageContextMenu = this.closePageContextMenu.bind(this)
+    this.handleFind = this.handleFind.bind(this)
+    this.closeFind = this.closeFind.bind(this)
+
+    // Ctrl/Cmd+F opens our find bar; it must not reach the page or VS Code,
+    // which can only search the webview (a screenshot of the page)
+    window.addEventListener('keydown', (event) => {
+      if (this.state.isDebug || !(event.ctrlKey || event.metaKey) || event.altKey || event.code !== 'KeyF')
+        return
+      event.preventDefault()
+      event.stopPropagation()
+      if (this.state.isFindOpen)
+        this.findBar?.focus()
+      else
+        this.updateState({ isFindOpen: true, findResult: null })
+    }, true)
 
     // remember where the screencast was right-clicked, the page reports
     // what was under the cursor shortly after ('extension.contextMenu')
@@ -115,6 +141,10 @@ class App extends React.Component<any, IState> {
         ? { x: event.clientX, y: event.clientY }
         : null
     }, true)
+
+    this.connection.on('extension.history', (visitedPages: HistoryEntry[]) => {
+      this.updateState({ visitedPages })
+    })
 
     this.connection.on('extension.contextMenu', (info: ContextMenuInfo) => {
       if (!this.lastContextMenuPosition || this.state.isInspectEnabled)
@@ -141,6 +171,8 @@ class App extends React.Component<any, IState> {
         this.requestNavigationHistory()
         this.updateState({
           pageContextMenu: null,
+          // the page's highlights are gone after navigating
+          findResult: null,
           viewportMetadata: {
             ...this.state.viewportMetadata,
             isLoading: true,
@@ -154,6 +186,8 @@ class App extends React.Component<any, IState> {
     })
 
     this.connection.on('Page.loadEventFired', (result: any) => {
+      // the title is usually only known once the page has loaded
+      this.requestNavigationHistory()
       this.updateState({
         viewportMetadata: {
           ...this.state.viewportMetadata,
@@ -280,6 +314,15 @@ class App extends React.Component<any, IState> {
                 canGoForward={this.state.history.canGoForward}
                 isInspectEnabled={this.state.isInspectEnabled}
                 isDeviceEmulationEnabled={this.state.isDeviceEmulationEnabled}
+                visitedPages={this.state.visitedPages}
+                overlay={this.state.isFindOpen && (
+                  <FindBar
+                    ref={c => this.findBar = c}
+                    result={this.state.findResult}
+                    onFind={this.handleFind}
+                    onClose={this.closeFind}
+                  />
+                )}
               />
               )
         }
@@ -295,8 +338,8 @@ class App extends React.Component<any, IState> {
           onViewportChanged={this.onViewportChanged}
           ref={c => this.viewport = c!}
         />
-        <PageContextMenu
-          menu={this.state.pageContextMenu}
+        <Menu
+          position={this.state.pageContextMenu?.position ?? null}
           items={this.getPageContextMenuItems()}
           onClose={this.closePageContextMenu}
         />
@@ -304,12 +347,27 @@ class App extends React.Component<any, IState> {
     )
   }
 
+  private async handleFind(text: string, backwards: boolean) {
+    const response: any = await this.connection.send('Runtime.evaluate', {
+      expression: findExpression(text, backwards),
+      returnByValue: true,
+    })
+    this.updateState({ findResult: response?.result?.value ?? { current: 0, total: 0 } })
+  }
+
+  private closeFind() {
+    this.connection.send('Runtime.evaluate', { expression: clearFindExpression() })
+    this.updateState({ isFindOpen: false, findResult: null })
+    // give keyboard focus back to the page
+    document.querySelector<HTMLElement>('img.screencast')?.focus()
+  }
+
   private closePageContextMenu() {
     if (this.state.pageContextMenu)
       this.updateState({ pageContextMenu: null })
   }
 
-  private getPageContextMenuItems(): PageContextMenuEntry[] {
+  private getPageContextMenuItems(): MenuEntry[] {
     const info = this.state.pageContextMenu?.info
     if (!info)
       return []
@@ -320,7 +378,7 @@ class App extends React.Component<any, IState> {
     const copy = (value: string) => this.handleClipboardWrite({ value })
     const evaluate = (expression: string) => this.connection.send('Runtime.evaluate', { expression, userGesture: true })
 
-    const groups: PageContextMenuEntry[][] = []
+    const groups: MenuEntry[][] = []
 
     if (info.linkUrl) {
       groups.push([
@@ -343,42 +401,42 @@ class App extends React.Component<any, IState> {
       groups.push([
         {
           label: 'Cut',
-          shortcut: `${mod}X`,
+          hint: `${mod}X`,
           disabled: !hasSelection,
           action: async () => {
             await copy(info.selectionText)
             evaluate('document.execCommand("delete")')
           },
         },
-        { label: 'Copy', shortcut: `${mod}C`, disabled: !hasSelection, action: () => copy(info.selectionText) },
+        { label: 'Copy', hint: `${mod}C`, disabled: !hasSelection, action: () => copy(info.selectionText) },
         {
           label: 'Paste',
-          shortcut: `${mod}V`,
+          hint: `${mod}V`,
           action: async () => {
             const text = await this.connection.send<string>('Clipboard.readText')
             if (text)
               this.connection.send('Input.insertText', { text })
           },
         },
-        { label: 'Select All', shortcut: `${mod}A`, action: () => evaluate('document.execCommand("selectAll")') },
+        { label: 'Select All', hint: `${mod}A`, action: () => evaluate('document.execCommand("selectAll")') },
       ])
     }
     else if (hasSelection) {
       groups.push([
-        { label: 'Copy', shortcut: `${mod}C`, action: () => copy(info.selectionText) },
+        { label: 'Copy', hint: `${mod}C`, action: () => copy(info.selectionText) },
       ])
     }
 
     if (!groups.length) {
       groups.push([
-        { label: 'Back', shortcut: this.isMac ? '⌘[' : 'Alt+Left Arrow', action: () => this.onToolbarActionInvoked('backward', {}) },
-        { label: 'Forward', shortcut: this.isMac ? '⌘]' : 'Alt+Right Arrow', action: () => this.onToolbarActionInvoked('forward', {}) },
-        { label: 'Reload', shortcut: `${mod}R`, action: () => this.onToolbarActionInvoked('refresh', {}) },
+        { label: 'Back', hint: this.isMac ? '⌘[' : 'Alt+Left Arrow', action: () => this.onToolbarActionInvoked('backward', {}) },
+        { label: 'Forward', hint: this.isMac ? '⌘]' : 'Alt+Right Arrow', action: () => this.onToolbarActionInvoked('forward', {}) },
+        { label: 'Reload', hint: `${mod}R`, action: () => this.onToolbarActionInvoked('refresh', {}) },
       ])
       groups.push([
         { label: 'Open Page in System Browser', action: () => openExternal(info.pageUrl) },
         { label: 'Copy Page Address', action: () => copy(info.pageUrl) },
-        { label: 'View Page Source', shortcut: `${mod}U`, action: () => openInNewTab(`view-source:${info.pageUrl}`) },
+        { label: 'View Page Source', hint: `${mod}U`, action: () => openInNewTab(`view-source:${info.pageUrl}`) },
       ])
     }
 
@@ -591,6 +649,12 @@ class App extends React.Component<any, IState> {
       case 'refresh':
         this.connection.send('Page.reload')
         break
+      case 'stop':
+        this.connection.send('Page.stopLoading')
+        this.updateState({
+          viewportMetadata: { ...this.state.viewportMetadata, isLoading: false, loadingPercent: 0 },
+        })
+        break
       case 'inspect':
         this.handleToggleInspect()
         break
@@ -599,6 +663,12 @@ class App extends React.Component<any, IState> {
         break
       case 'urlChange':
         this.handleNavigate(data.url)
+        break
+      case 'newTab':
+        this.connection.send('extension.newTab')
+        break
+      case 'clearBrowsingData':
+        this.connection.send('extension.clearBrowsingData')
         break
       case 'readClipboard':
         return this.connection.send('Clipboard.readText')

@@ -1,6 +1,6 @@
 .viewport {
   display: flex;
-  background: var(---vscode-background);
+  background: var(--ab-page-bg);
   position: relative;
   overflow: hidden;
   box-sizing: border-box;

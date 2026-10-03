@@ -1,5 +1,7 @@
 import EventEmitterEnhancer, { EnhancedEventEmitter } from 'event-emitter-enhancer'
 import type { Browser, CDPSession, Page } from 'puppeteer-core'
+import type { Protocol } from 'devtools-protocol'
+import { window, workspace } from 'vscode'
 import { Clipboard } from './Clipboard'
 import { isDarkTheme } from './Config'
 import type { ContextMenuInfo } from './ContextMenuInfo'
@@ -168,5 +170,59 @@ export class BrowserPage extends EnhancedEventEmitter {
         result: data,
       } as any)
     })
+
+    // headless Chromium has no file dialog: show VS Code's instead when a page asks for files
+    await this.client.send('Page.enable')
+    await this.client.send('Page.setInterceptFileChooserDialog', { enabled: true })
+    this.client.on('Page.fileChooserOpened', e => this.handleFileChooser(e).catch((err) => {
+      window.showErrorMessage(`Amaze Browser: Failed to upload files: ${err instanceof Error ? err.message : err}`)
+    }))
   }
+
+  private async handleFileChooser({ backendNodeId, mode }: Protocol.Page.FileChooserOpenedEvent) {
+    if (!backendNodeId)
+      return
+
+    const { node } = await this.client.send('DOM.describeNode', { backendNodeId })
+    const attributes = node.attributes || []
+    const accept = attributes[attributes.indexOf('accept') + 1] ?? ''
+    const extensions = acceptToExtensions(attributes.includes('accept') ? accept : '')
+
+    const files = await window.showOpenDialog({
+      canSelectFiles: true,
+      canSelectFolders: false,
+      canSelectMany: mode === 'selectMultiple',
+      defaultUri: workspace.workspaceFolders?.[0]?.uri,
+      openLabel: 'Upload',
+      title: 'Choose files to upload',
+      filters: extensions.length ? { 'Accepted files': extensions, 'All files': ['*'] } : undefined,
+    })
+    // cancelled: leave the input untouched, like a browser does
+    if (!files?.length)
+      return
+
+    await this.client.send('DOM.setFileInputFiles', { backendNodeId, files: files.map(f => f.fsPath) })
+  }
+}
+
+const MIME_EXTENSIONS: Record<string, string[]> = {
+  'image/*': ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'avif', 'bmp', 'ico'],
+  'video/*': ['mp4', 'webm', 'mov', 'mkv', 'avi'],
+  'audio/*': ['mp3', 'wav', 'ogg', 'm4a', 'flac'],
+  'application/pdf': ['pdf'],
+  'application/json': ['json'],
+  'text/plain': ['txt'],
+  'text/csv': ['csv'],
+}
+
+// Turns an <input accept="..."> value into file-extension filters for the dialog
+function acceptToExtensions(accept: string) {
+  const extensions = new Set<string>()
+  for (const token of accept.split(',').map(t => t.trim().toLowerCase()).filter(Boolean)) {
+    if (token.startsWith('.'))
+      extensions.add(token.slice(1))
+    else
+      MIME_EXTENSIONS[token]?.forEach(e => extensions.add(e))
+  }
+  return [...extensions]
 }

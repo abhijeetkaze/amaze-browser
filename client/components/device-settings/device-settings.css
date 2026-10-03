@@ -1,20 +1,56 @@
 .device-settings {
   display: none;
-  padding: 8px;
-}
-
-.device-settings * {
-  vertical-align: middle;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 8px;
+  border-top: 1px solid var(--ab-border);
 }
 
 .device-settings.active {
-  display: block;
+  display: flex;
+}
+
+.device-selector,
+.viewport-size-input {
+  height: 26px;
+  box-sizing: border-box;
+  border: 1px solid var(--ab-field-border);
+  border-radius: var(--ab-radius);
+  background: var(--ab-field-bg);
+  color: var(--ab-fg);
+  font: inherit;
+  outline: none;
+  transition: border-color var(--ab-duration) ease-out;
 }
 
 .device-selector {
-  height: 29px;
-  margin: 0 8px;
-  padding: 6px;
+  padding: 0 8px;
+  cursor: pointer;
+}
+
+.device-selector:hover,
+.viewport-size-input:hover {
+  border-color: var(--ab-border);
+}
+
+.device-selector:focus-visible,
+.viewport-size-input:focus {
+  border-color: var(--ab-focus);
+}
+
+/* replaces VS Code's default `input:focus`/`select:focus` outline with the border above */
+.device-settings .device-selector:focus,
+.device-settings .viewport-size-input:focus {
+  outline: none;
+}
+
+.viewport-size-input {
+  width: 60px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  -moz-appearance: textfield;
 }
 
 input::-webkit-outer-spin-button,
@@ -23,15 +59,12 @@ input::-webkit-inner-spin-button {
   margin: 0;
 }
 
-.viewport-size-input {
-  max-width: 50px;
-  height: 29px;
-  box-sizing: border-box;
-  text-align: center;
-  outline: 0;
-  -moz-appearance: textfield;
+.metadata {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .metadata .spacer {
-  padding: 0 2px;
+  color: var(--ab-muted);
 }

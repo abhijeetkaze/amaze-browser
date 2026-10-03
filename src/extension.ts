@@ -31,6 +31,12 @@ export function activate(ctx: ExtensionContext) {
       }
     }),
 
+    commands.registerCommand('amaze-browser.newTab', () => manager.create()),
+
+    commands.registerCommand('amaze-browser.showHistory', () => manager.showHistory()),
+
+    commands.registerCommand('amaze-browser.clearBrowsingData', () => manager.clearBrowsingData()),
+
     commands.registerCommand('amaze-browser.openActiveFile', () => {
       const filename = window.activeTextEditor?.document?.fileName
       manager.createFile(filename)

@@ -1,27 +1,82 @@
-.urlbar {
+.omnibox {
+  position: relative;
   display: flex;
+  align-items: center;
   flex: 1;
-  user-select: all;
-  margin: 0 4px 0 4px;
-  padding: 0 6px;
-  width: 100%;
-  height: 29px;
+  min-width: 0;
+  height: 30px;
+  padding: 0 4px 0 10px;
+  border: 1px solid var(--ab-field-border);
+  border-radius: var(--ab-radius-pill);
+  background: var(--ab-field-bg);
+  transition: border-color var(--ab-duration) ease-out, box-shadow var(--ab-duration) ease-out;
 }
 
-input, select {
-  color: var(--vscode-input-foreground);
-  border: 0;
-  outline: none !important;
-  border-radius: 2px;
-  background: var(--vscode-input-background);
-  border: 1px solid var(--vscode-input-border);
-  color: var(--vscode-input-foreground);
+.omnibox:hover {
+  border-color: var(--ab-border);
+}
+
+.omnibox.focused {
+  border-color: var(--ab-focus);
+  box-shadow: 0 0 0 1px var(--ab-focus);
+}
+
+.omnibox-security {
+  display: inline-flex;
+  flex-shrink: 0;
+  margin-right: 8px;
+  color: var(--ab-muted);
+}
+
+.urlbar {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--ab-fg);
+  font: inherit;
+  font-size: 13px;
+}
+
+/* VS Code's webview stylesheet adds `input:focus { outline: ... focus-ring-color }`,
+   which draws the OS accent color (orange on Ubuntu) inside our own focus ring */
+.omnibox .urlbar:focus {
+  outline: none;
+}
+
+.urlbar::placeholder {
+  color: var(--ab-muted);
+}
+
+/* the formatted overlay is shown instead of the raw text while not editing */
+.urlbar.formatted {
+  color: transparent;
+}
+
+.omnibox-display {
+  position: absolute;
+  inset: 0 12px 0 32px;
+  display: flex;
+  align-items: center;
   overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  font-size: 13px;
+  text-align: left;
 }
 
-input:focus, select:focus, input:active, select:active {
-  border-color: var(--vscode-inputOption-activeBorder);
-  color: var(--vscode-inputOption-activeForeground);
+.omnibox-display .host {
+  color: var(--ab-fg);
+}
+
+.omnibox-display .rest {
+  color: var(--ab-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .contextMenu {
