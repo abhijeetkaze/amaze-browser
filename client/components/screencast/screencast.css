@@ -8,6 +8,7 @@ img.screencast {
   image-rendering: crisp-edges;
   backface-visibility: hidden;
   outline: none;
+  user-select: none;
   position: absolute;
   top: 0;
   left: 0;

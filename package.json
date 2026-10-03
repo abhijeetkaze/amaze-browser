@@ -69,7 +69,7 @@
           "type": "string"
         },
         "browse-lite.chromeExecutable": {
-          "description": "The full path to the executable, including the complete filename of the executable",
+          "description": "The full path to the executable, including the complete filename of the executable. When empty on Linux, Browse Lite downloads and uses its own Chromium build.",
           "type": "string"
         },
         "browse-lite.verbose": {
@@ -289,6 +289,7 @@
   "devDependencies": {
     "@antfu/eslint-config": "^1.0.0-beta.27",
     "@chiragrupani/karma-chromium-edge-launcher": "^2.3.1",
+    "@puppeteer/browsers": "^1.9.1",
     "@types/karma-chrome-launcher": "^3.1.2",
     "@types/lodash": "^4.14.199",
     "@types/node": "20.8.6",

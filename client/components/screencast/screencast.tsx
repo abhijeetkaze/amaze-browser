@@ -133,7 +133,9 @@ class Screencast extends React.Component<any, any> {
     event.stopPropagation()
     this.emitKeyEvent(event.nativeEvent)
 
-    if (event.key === 'Tab')
+    // Tab would move focus away, and Ctrl/Cmd+A would select the whole webview
+    // instead of the page's content (the page handles select-all itself)
+    if (event.key === 'Tab' || ((event.ctrlKey || event.metaKey) && event.code === 'KeyA'))
       event.preventDefault()
 
     if (this.imageRef.current)

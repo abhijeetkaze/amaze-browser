@@ -11,6 +11,7 @@ import { window, workspace } from 'vscode'
 import type { ExtensionConfiguration } from './ExtensionConfiguration'
 import { tryPort } from './Config'
 import { BrowserPage } from './BrowserPage'
+import { ensureChromium } from './ChromiumDownloader'
 
 export class BrowserClient extends EventEmitter {
   private browser: Browser
@@ -38,7 +39,9 @@ export class BrowserClient extends EventEmitter {
     if (this.config.otherArgs && this.config.otherArgs.length > 0)
       chromeArgs.push(this.config.otherArgs)
 
-    const chromePath = this.config.chromeExecutable || this.getChromiumPath()
+    const chromePath = this.config.chromeExecutable
+      || await ensureChromium(this.ctx)
+      || this.getChromiumPath()
 
     if (!chromePath) {
       window.showErrorMessage(
@@ -73,9 +76,24 @@ export class BrowserClient extends EventEmitter {
     if (!this.browser)
       await this.launchBrowser()
 
-    const page = new BrowserPage(this.browser, await this.browser.newPage())
+    const page = new BrowserPage(this.browser, await this.createPageInNewWindow())
     await page.launch()
     return page
+  }
+
+  // Each page gets its own window: a page that shares a window with another one
+  // becomes a background tab, which Chromium stops rendering, freezing its screencast
+  private async createPageInNewWindow() {
+    const session = await this.browser.target().createCDPSession()
+    try {
+      const { targetId } = await session.send('Target.createTarget', { url: 'about:blank', newWindow: true })
+      // @ts-expect-error private API
+      const target = await this.browser.waitForTarget(t => t._targetId === targetId)
+      return await target.page()
+    }
+    finally {
+      session.detach()
+    }
   }
 
   public dispose(): Promise<void> {

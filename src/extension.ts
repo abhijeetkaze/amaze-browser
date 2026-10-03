@@ -2,11 +2,18 @@ import type { ExtensionContext, Uri } from 'vscode'
 import { commands, debug, window } from 'vscode'
 
 import { DebugProvider } from './DebugProvider'
+import { ensureChromium } from './ChromiumDownloader'
+import { getConfig } from './Config'
 import { PanelManager } from './PanelManager'
 
 export function activate(ctx: ExtensionContext) {
   const manager = new PanelManager(ctx)
   const debugProvider = new DebugProvider(manager)
+
+  // Download Chromium in the background on first activation (Linux only),
+  // unless the user has configured their own executable
+  if (!getConfig<string>('browse-lite.chromeExecutable'))
+    ensureChromium(ctx)
 
   ctx.subscriptions.push(
 

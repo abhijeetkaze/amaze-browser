@@ -3,8 +3,11 @@ import './App.css'
 
 import { resolve as getElementSourceMetadata } from 'element-to-source'
 import type { ExtensionConfiguration } from '../src/ExtensionConfiguration'
+import type { ContextMenuInfo } from '../src/ContextMenuInfo'
 import Toolbar from './components/toolbar/toolbar'
 import Viewport from './components/viewport/viewport'
+import PageContextMenu from './components/page-contextmenu/page-contextmenu'
+import type { PageContextMenuEntry, PageContextMenuState } from './components/page-contextmenu/page-contextmenu'
 import Connection from './connection'
 import { CDPHelper } from './utils/cdpHelper'
 
@@ -26,6 +29,7 @@ interface IState {
   isVerboseMode: boolean
   isInspectEnabled: boolean
   isDeviceEmulationEnabled: boolean
+  pageContextMenu: PageContextMenuState | null
   viewportMetadata: IViewport
   history: {
     canGoBack: boolean
@@ -59,6 +63,8 @@ class App extends React.Component<any, IState> {
   private viewport: Viewport = undefined!
   private cdpHelper: CDPHelper
   private nextViewportSize: { width: number; height: number } | undefined
+  private lastContextMenuPosition: { x: number, y: number } | null = null
+  private readonly isMac = /macintosh|mac os x/i.test(navigator.userAgent)
 
   constructor(props: any) {
     super(props)
@@ -73,6 +79,7 @@ class App extends React.Component<any, IState> {
       errorText: undefined,
       isInspectEnabled: false,
       isDeviceEmulationEnabled: false,
+      pageContextMenu: null,
       history: {
         canGoBack: false,
         canGoForward: false,
@@ -99,6 +106,22 @@ class App extends React.Component<any, IState> {
     this.connection = new Connection()
     this.onToolbarActionInvoked = this.onToolbarActionInvoked.bind(this)
     this.onViewportChanged = this.onViewportChanged.bind(this)
+    this.closePageContextMenu = this.closePageContextMenu.bind(this)
+
+    // remember where the screencast was right-clicked, the page reports
+    // what was under the cursor shortly after ('extension.contextMenu')
+    window.addEventListener('contextmenu', (event) => {
+      this.lastContextMenuPosition = (event.target as Element)?.classList?.contains('screencast')
+        ? { x: event.clientX, y: event.clientY }
+        : null
+    }, true)
+
+    this.connection.on('extension.contextMenu', (info: ContextMenuInfo) => {
+      if (!this.lastContextMenuPosition || this.state.isInspectEnabled)
+        return
+      this.updateState({ pageContextMenu: { info, position: this.lastContextMenuPosition } })
+      this.lastContextMenuPosition = null
+    })
 
     this.connection.enableVerboseLogging(this.state.isVerboseMode)
 
@@ -117,6 +140,7 @@ class App extends React.Component<any, IState> {
       if (isMainFrame) {
         this.requestNavigationHistory()
         this.updateState({
+          pageContextMenu: null,
           viewportMetadata: {
             ...this.state.viewportMetadata,
             isLoading: true,
@@ -271,8 +295,97 @@ class App extends React.Component<any, IState> {
           onViewportChanged={this.onViewportChanged}
           ref={c => this.viewport = c!}
         />
+        <PageContextMenu
+          menu={this.state.pageContextMenu}
+          items={this.getPageContextMenuItems()}
+          onClose={this.closePageContextMenu}
+        />
       </div>
     )
+  }
+
+  private closePageContextMenu() {
+    if (this.state.pageContextMenu)
+      this.updateState({ pageContextMenu: null })
+  }
+
+  private getPageContextMenuItems(): PageContextMenuEntry[] {
+    const info = this.state.pageContextMenu?.info
+    if (!info)
+      return []
+
+    const mod = this.isMac ? '⌘' : 'Ctrl+'
+    const openInNewTab = (url: string) => this.connection.send('extension.windowOpenRequested', { url })
+    const openExternal = (url: string) => this.connection.send('extension.openExternal', { url })
+    const copy = (value: string) => this.handleClipboardWrite({ value })
+    const evaluate = (expression: string) => this.connection.send('Runtime.evaluate', { expression, userGesture: true })
+
+    const groups: PageContextMenuEntry[][] = []
+
+    if (info.linkUrl) {
+      groups.push([
+        { label: 'Open Link in New Tab', action: () => openInNewTab(info.linkUrl!) },
+        { label: 'Open Link in System Browser', action: () => openExternal(info.linkUrl!) },
+        { label: 'Copy Link Address', action: () => copy(info.linkUrl!) },
+      ])
+    }
+
+    if (info.srcUrl) {
+      const kind = info.mediaType === 'img' ? 'Image' : info.mediaType === 'video' ? 'Video' : 'Audio'
+      groups.push([
+        { label: `Open ${kind} in New Tab`, action: () => openInNewTab(info.srcUrl!) },
+        { label: `Copy ${kind} Address`, action: () => copy(info.srcUrl!) },
+      ])
+    }
+
+    const hasSelection = info.selectionText.length > 0
+    if (info.isEditable) {
+      groups.push([
+        {
+          label: 'Cut',
+          shortcut: `${mod}X`,
+          disabled: !hasSelection,
+          action: async () => {
+            await copy(info.selectionText)
+            evaluate('document.execCommand("delete")')
+          },
+        },
+        { label: 'Copy', shortcut: `${mod}C`, disabled: !hasSelection, action: () => copy(info.selectionText) },
+        {
+          label: 'Paste',
+          shortcut: `${mod}V`,
+          action: async () => {
+            const text = await this.connection.send<string>('Clipboard.readText')
+            if (text)
+              this.connection.send('Input.insertText', { text })
+          },
+        },
+        { label: 'Select All', shortcut: `${mod}A`, action: () => evaluate('document.execCommand("selectAll")') },
+      ])
+    }
+    else if (hasSelection) {
+      groups.push([
+        { label: 'Copy', shortcut: `${mod}C`, action: () => copy(info.selectionText) },
+      ])
+    }
+
+    if (!groups.length) {
+      groups.push([
+        { label: 'Back', shortcut: this.isMac ? '⌘[' : 'Alt+Left Arrow', action: () => this.onToolbarActionInvoked('backward', {}) },
+        { label: 'Forward', shortcut: this.isMac ? '⌘]' : 'Alt+Right Arrow', action: () => this.onToolbarActionInvoked('forward', {}) },
+        { label: 'Reload', shortcut: `${mod}R`, action: () => this.onToolbarActionInvoked('refresh', {}) },
+      ])
+      groups.push([
+        { label: 'Open Page in System Browser', action: () => openExternal(info.pageUrl) },
+        { label: 'Copy Page Address', action: () => copy(info.pageUrl) },
+        { label: 'View Page Source', shortcut: `${mod}U`, action: () => openInNewTab(`view-source:${info.pageUrl}`) },
+      ])
+    }
+
+    if (!this.state.isDebug)
+      groups.push([{ label: 'Open DevTools', action: () => this.connection.send('extension.openDevTools') }])
+
+    return groups.flatMap((group, i) => i === 0 ? group : [null, ...group])
   }
 
   public stopCasting() {
@@ -645,6 +758,10 @@ class App extends React.Component<any, IState> {
           showStyles: true,
           showRulers: true,
           showExtensionLines: true,
+          contentColor: { r: 111, g: 168, b: 220, a: 0.66 },
+          paddingColor: { r: 147, g: 196, b: 125, a: 0.55 },
+          borderColor: { r: 255, g: 229, b: 153, a: 0.66 },
+          marginColor: { r: 246, g: 178, b: 107, a: 0.66 },
         },
       })
 

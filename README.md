@@ -34,6 +34,40 @@ Embedded browser in VS Code
 
 This extension was originally built for [VS Code for Vite](https://github.com/antfu/vscode-vite).
 
+## Browser
+
+Browse Lite picks the browser in this order:
+
+1. The executable set in `browse-lite.chromeExecutable`
+2. **Linux only:** a Chromium build that Browse Lite downloads itself
+3. A Chrome or Edge installation found on the system
+
+### Bundled Chromium (Linux)
+
+If `browse-lite.chromeExecutable` is not set, Browse Lite downloads an open-source [Chromium snapshot](https://commondatastorage.googleapis.com/chromium-browser-snapshots/index.html?prefix=Linux_x64/) (~150MB) the first time it activates and shows the progress in a notification. Later activations reuse it.
+
+It is saved in the extension's global storage folder:
+
+```
+~/.config/Code/User/globalStorage/antfu.browse-lite/chromium/chromium/linux-<build>/chrome-linux/chrome
+```
+
+The first part of the path depends on how you run VS Code:
+
+| Setup | Global storage folder |
+| --- | --- |
+| VS Code | `~/.config/Code/User/globalStorage/antfu.browse-lite/` |
+| VS Code Insiders | `~/.config/Code - Insiders/User/globalStorage/antfu.browse-lite/` |
+| VSCodium | `~/.config/VSCodium/User/globalStorage/antfu.browse-lite/` |
+| Remote-SSH / WSL | `~/.vscode-server/data/User/globalStorage/antfu.browse-lite/` |
+
+Things to know:
+
+- The build is pinned by `CHROMIUM_BUILD_ID` in [`src/ChromiumDownloader.ts`](src/ChromiumDownloader.ts). When it changes, the new build is downloaded once and older builds are deleted.
+- The download is kept across extension updates and removed by VS Code when the extension is uninstalled.
+- Chromium needs the usual system libraries (for example `libnss3`, `libatk-bridge2.0-0`, `libgbm1`). If they are missing, install them or set `browse-lite.chromeExecutable` to another browser.
+- If the download fails, Browse Lite shows a warning, falls back to a system browser and tries the download again on the next launch.
+
 ## Sponsors
 
 This project is part of my [Sponsor Program](https://github.com/sponsors/antfu).

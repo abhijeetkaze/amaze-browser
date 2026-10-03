@@ -2,11 +2,13 @@ import EventEmitterEnhancer, { EnhancedEventEmitter } from 'event-emitter-enhanc
 import type { Browser, CDPSession, Page } from 'puppeteer-core'
 import { Clipboard } from './Clipboard'
 import { isDarkTheme } from './Config'
+import type { ContextMenuInfo } from './ContextMenuInfo'
 
 enum ExposedFunc {
   EmitCopy = 'EMIT_BROWSER_LITE_ON_COPY',
   GetPaste = 'EMIT_BROWSER_LITE_GET_PASTE',
   EnableCopyPaste = 'ENABLE_BROWSER_LITE_HOOK_COPY_PASTE',
+  EmitContextMenu = 'EMIT_BROWSER_LITE_ON_CONTEXT_MENU',
 }
 
 export class BrowserPage extends EnhancedEventEmitter {
@@ -34,6 +36,7 @@ export class BrowserPage extends EnhancedEventEmitter {
       this.page.removeExposedFunction(ExposedFunc.EnableCopyPaste),
       this.page.removeExposedFunction(ExposedFunc.EmitCopy),
       this.page.removeExposedFunction(ExposedFunc.GetPaste),
+      this.page.removeExposedFunction(ExposedFunc.EmitContextMenu),
     ]).then(() => {
       this.page.close()
     })
@@ -62,6 +65,15 @@ export class BrowserPage extends EnhancedEventEmitter {
           } as any)
         }
         break
+      case 'Clipboard.writeText':
+        try {
+          await this.clipboard.writeText((data as { value: string }).value)
+          this.emit({ callbackId, result: undefined } as any)
+        }
+        catch (e) {
+          this.emit({ callbackId, error: e.message } as any)
+        }
+        break
       default:
         this.client
           .send(action as any, data)
@@ -86,11 +98,17 @@ export class BrowserPage extends EnhancedEventEmitter {
       this.page.exposeFunction(ExposedFunc.EnableCopyPaste, () => true),
       this.page.exposeFunction(ExposedFunc.EmitCopy, (text: string) => this.clipboard.writeText(text)),
       this.page.exposeFunction(ExposedFunc.GetPaste, () => this.clipboard.readText()),
+      this.page.exposeFunction(ExposedFunc.EmitContextMenu, (info: ContextMenuInfo) => {
+        this.emit({ method: 'extension.contextMenu', result: info } as any)
+      }),
     ])
     this.page.evaluateOnNewDocument(() => {
       // custom embedded devtools
+      // (newer DevTools versions use kebab-case setting names)
       localStorage.setItem('screencastEnabled', 'false')
+      localStorage.setItem('screencast-enabled', 'false')
       localStorage.setItem('panel-selectedTab', 'console')
+      localStorage.setItem('panel-selected-tab', 'console')
 
       // sync copy and paste
       if (window[ExposedFunc.EnableCopyPaste]?.()) {
@@ -106,6 +124,33 @@ export class BrowserPage extends EnhancedEventEmitter {
           text && document.execCommand('insertText', false, text)
         })
       }
+    })
+
+    this.page.evaluateOnNewDocument(() => {
+      // headless Chromium has no native context menu, report what was clicked
+      // so the webview can render its own (unless the page shows a custom one)
+      window.addEventListener('contextmenu', (event) => {
+        setTimeout(() => {
+          if (event.defaultPrevented || !(event.target instanceof Element))
+            return
+          const target = event.target
+          const link = target.closest('a[href]') as HTMLAnchorElement | null
+          const media = target.closest('img, video, audio') as HTMLImageElement | HTMLMediaElement | null
+          const field = target.closest('input, textarea') as HTMLInputElement | HTMLTextAreaElement | null
+          const isEditable = (!!field && !field.readOnly && !field.disabled) || (target as HTMLElement).isContentEditable
+          let selectionText = document.getSelection()?.toString() || ''
+          if (field && typeof field.selectionStart === 'number')
+            selectionText = field.value.slice(field.selectionStart, field.selectionEnd ?? field.selectionStart)
+          window[ExposedFunc.EmitContextMenu]?.({
+            pageUrl: location.href,
+            linkUrl: link?.href,
+            srcUrl: media ? (media.currentSrc || media.src) : undefined,
+            mediaType: media?.tagName.toLowerCase(),
+            selectionText,
+            isEditable,
+          })
+        })
+      })
     })
 
     this.page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: isDarkTheme() ? 'dark' : 'light' }])
