@@ -3,13 +3,23 @@
 All notable changes to Amaze Browser are documented here.
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [1.2.0] - 2026-10-03
+
+### Added
+
+- Page zoom from the toolbar (zoom out, the current level, zoom in) and with <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>=</kbd>, <kbd>-</kbd> and <kbd>0</kbd>, in Chrome's steps from 25% to 500%; the page re-lays out like in a browser
+- A link to the author's website, [abhijeetmohanta.in](https://abhijeetmohanta.in), in the README and the extension's author details
+
+### Fixed
+
+- The README listed the old image quality default (100 instead of 80)
+
 ## [1.1.0] - 2026-10-03
 
 ### Added
 
 - Sponsor link in the marketplace listing and README, and a support item in the history menu
 - An occasional notification asking regular users to support the project, at most twice and never again once they support or decline (turn off with `amaze-browser.showSupportPrompt`), and a **Show Support Notification** command
-- Page zoom from the toolbar (zoom out, the current level, zoom in) and with <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>=</kbd>, <kbd>-</kbd> and <kbd>0</kbd>, in Chrome's steps from 25% to 500%; the page re-lays out like in a browser
 
 ### Changed
 
@@ -58,6 +68,7 @@ The first release of Amaze Browser, a fork of [Browse Lite](https://github.com/a
 - Panels moved to another window reconnect instead of coming back blank
 - No orange focus outline in inputs, broken-image icon before the first frame, or wrong viewport background
 
+[1.2.0]: https://github.com/abhijeetkaze/amaze-browser/releases/tag/v1.2.0
 [1.1.0]: https://github.com/abhijeetkaze/amaze-browser/releases/tag/v1.1.0
 [1.0.1]: https://github.com/abhijeetkaze/amaze-browser/releases/tag/v1.0.1
 [1.0.0]: https://github.com/abhijeetkaze/amaze-browser/releases/tag/v1.0.0

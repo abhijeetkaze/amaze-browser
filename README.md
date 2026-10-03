@@ -14,6 +14,7 @@
   <a href="https://open-vsx.org/extension/abhijeetkaze/amaze-browser"><img src="https://img.shields.io/open-vsx/dt/abhijeetkaze/amaze-browser?style=flat-square&label=downloads&color=22D3EE" alt="Open VSX downloads"/></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-0F172A?style=flat-square" alt="MIT license"/></a>
   <a href="https://www.buymeacoffee.com/abhijeetkaze"><img src="https://img.shields.io/badge/buy%20me%20a%20coffee-FFDD00?style=flat-square&logo=buymeacoffee&logoColor=black" alt="Buy me a coffee"/></a>
+  <a href="https://abhijeetmohanta.in"><img src="https://img.shields.io/badge/made%20by-Abhijeet%20Mohanta-0F172A?style=flat-square" alt="Made by Abhijeet Mohanta, visit abhijeetmohanta.in"/></a>
 </p>
 
 <p align="center">
@@ -31,6 +32,7 @@
 | Feature | What it does |
 | --- | --- |
 | **Embedded browser** | Browse any URL or local file in an editor tab, with back, forward, reload and an address bar |
+| **Zoom** | Zoom the page from the toolbar or with <kbd>Ctrl</kbd>+<kbd>=</kbd>, <kbd>Ctrl</kbd>+<kbd>-</kbd> and <kbd>Ctrl</kbd>+<kbd>0</kbd> (<kbd>Cmd</kbd> on macOS), from 25% to 500% |
 | **Find in page** | <kbd>Ctrl</kbd>+<kbd>F</kbd> (<kbd>Cmd</kbd>+<kbd>F</kbd> on macOS) highlights every match, with a count and next/previous |
 | **Tabs and history** | Open new tabs with one click and jump back to your 10 most recent pages |
 | **Clear browsing data** | Delete history and cookies in one step |
@@ -130,7 +132,7 @@ Use `"request": "attach"` to attach to a page that's already open.
 | `amaze-browser.proxy` | | Proxy server, for example `http://127.0.0.1:8080` |
 | `amaze-browser.otherArgs` | | Extra Chromium command-line arguments |
 | `amaze-browser.format` | `jpeg` | Image format for rendering the page (`png` or `jpeg`) |
-| `amaze-browser.quality` | `100` | Image quality for rendering (lower is faster) |
+| `amaze-browser.quality` | `80` | Image quality for rendering (lower is faster) |
 | `amaze-browser.everyNthFrame` | `1` | Render every Nth frame (higher is lighter on CPU) |
 | `amaze-browser.debugHost` | `localhost` | Host for the debugging connection |
 | `amaze-browser.debugPort` | `9222` | Port for the debugging connection. The next free port is used if it's taken |
@@ -181,6 +183,10 @@ pnpm run build:dev   # build the webview and the extension
 Then press <kbd>F5</kbd> in VS Code to launch an Extension Development Host with Amaze Browser loaded.
 
 The extension icon is drawn in [`resources/icon.svg`](resources/icon.svg). After editing it, export it to a 256×256 `resources/icon.png`.
+
+## Author
+
+Amaze Browser is built and maintained by **Abhijeet Mohanta**. See my other projects and get in touch at **[abhijeetmohanta.in](https://abhijeetmohanta.in)**, or follow my work on [GitHub](https://github.com/abhijeetkaze).
 
 ## Support
 

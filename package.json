@@ -2,12 +2,12 @@
   "publisher": "abhijeetkaze",
   "name": "amaze-browser",
   "displayName": "Amaze Browser",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "packageManager": "pnpm@8.9.2",
   "description": "A fast embedded Chromium browser inside VS Code, with DevTools, device emulation and live preview.",
   "author": {
     "name": "Abhijeet Mohanta",
-    "url": "https://github.com/abhijeetkaze"
+    "url": "https://abhijeetmohanta.in"
   },
   "license": "MIT",
   "repository": {
