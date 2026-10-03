@@ -3,6 +3,16 @@
 All notable changes to Amaze Browser are documented here.
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [1.3.0] - 2026-10-03
+
+### Added
+
+- Use Amaze Browser from your own browser: **Start HTTP Server** serves it at `http://localhost:8100` (change the port with `amaze-browser.server.port`), with the same toolbar, Inspect, zoom and find. Each browser tab gets its own page and keeps it when you reload. New tabs, DevTools and links open as real browser tabs, and page dialogs use the browser's own. The server only accepts connections from this machine and from its own page. Stop it with **Stop HTTP Server**
+
+### Fixed
+
+- A page could stay blank when a resize restarted the preview right as a page started loading
+
 ## [1.2.0] - 2026-10-03
 
 ### Added
@@ -68,6 +78,7 @@ The first release of Amaze Browser, a fork of [Browse Lite](https://github.com/a
 - Panels moved to another window reconnect instead of coming back blank
 - No orange focus outline in inputs, broken-image icon before the first frame, or wrong viewport background
 
+[1.3.0]: https://github.com/abhijeetkaze/amaze-browser/releases/tag/v1.3.0
 [1.2.0]: https://github.com/abhijeetkaze/amaze-browser/releases/tag/v1.2.0
 [1.1.0]: https://github.com/abhijeetkaze/amaze-browser/releases/tag/v1.1.0
 [1.0.1]: https://github.com/abhijeetkaze/amaze-browser/releases/tag/v1.0.1

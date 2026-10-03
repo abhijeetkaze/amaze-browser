@@ -32,6 +32,7 @@
 | Feature | What it does |
 | --- | --- |
 | **Embedded browser** | Browse any URL or local file in an editor tab, with back, forward, reload and an address bar |
+| **Use it from your own browser** | Start the HTTP server and open `http://localhost:8100` in Chrome or any browser |
 | **Zoom** | Zoom the page from the toolbar or with <kbd>Ctrl</kbd>+<kbd>=</kbd>, <kbd>Ctrl</kbd>+<kbd>-</kbd> and <kbd>Ctrl</kbd>+<kbd>0</kbd> (<kbd>Cmd</kbd> on macOS), from 25% to 500% |
 | **Find in page** | <kbd>Ctrl</kbd>+<kbd>F</kbd> (<kbd>Cmd</kbd>+<kbd>F</kbd> on macOS) highlights every match, with a count and next/previous |
 | **Tabs and history** | Open new tabs with one click and jump back to your 10 most recent pages |
@@ -82,6 +83,12 @@ The toolbar has a **+** button for a new tab and a clock button that lists the 1
 
 **Clear History and Cookies...** (at the bottom of the history list, or from the Command Palette) deletes the history and every cookie, which signs you out of websites. It works whether or not a tab is open.
 
+### Use it from your own browser
+
+Run **Amaze Browser: Start HTTP Server** and open `http://localhost:8100` in your own browser (the notification and the status bar item open it for you). You get the same browser as in VS Code: each tab gets its own page, and reloading a tab keeps its page. New tabs, DevTools and "open in system browser" open as tabs of your browser, and page dialogs use your browser's own.
+
+The server only listens on this machine and only accepts connections from its own page, so other websites can't control it. Change the port with `amaze-browser.server.port`, and stop the server with **Amaze Browser: Stop HTTP Server**. With VS Code Remote, the address shown is the one forwarded to your machine.
+
 ### Downloads and uploads
 
 Files you download are saved to `~/Downloads` (change it with `amaze-browser.downloadPath`). A notification shows the progress, lets you cancel, and offers **Open** and **Show in Folder** when it's done. If a file with the same name exists, the new one is saved as `name (1).ext`.
@@ -95,6 +102,8 @@ When a page asks you to choose a file to upload, VS Code's file picker opens in 
 | `Amaze Browser: Open...` | Open a URL in a new browser tab |
 | `Amaze Browser: New Tab` | Open a new tab at the start page |
 | `Amaze Browser: Show History` | Pick one of your 10 most recent pages |
+| `Amaze Browser: Start HTTP Server (Open in Your Browser)` | Serve Amaze Browser at `http://localhost:8100` for your own browser |
+| `Amaze Browser: Stop HTTP Server` | Stop the server and close its pages |
 | `Amaze Browser: Move DevTools...` | Put DevTools on the right, bottom or left, or in a separate window |
 | `Amaze Browser: Clear History and Cookies` | Delete history and all cookies (asks first) |
 | `Amaze Browser: Show Support Notification` | Show the option to buy me a coffee |
@@ -136,6 +145,7 @@ Use `"request": "attach"` to attach to a page that's already open.
 | `amaze-browser.everyNthFrame` | `1` | Render every Nth frame (higher is lighter on CPU) |
 | `amaze-browser.debugHost` | `localhost` | Host for the debugging connection |
 | `amaze-browser.debugPort` | `9222` | Port for the debugging connection. The next free port is used if it's taken |
+| `amaze-browser.server.port` | `8100` | Port of the HTTP server for using Amaze Browser from your own browser |
 | `amaze-browser.showSupportPrompt` | `true` | Occasionally ask whether you'd like to support the project (at most twice, only after regular use) |
 | `amaze-browser.verbose` | `false` | Log protocol messages for troubleshooting |
 
