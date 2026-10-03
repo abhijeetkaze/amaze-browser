@@ -120,6 +120,9 @@ export class Panel extends EventEmitter2 {
         if (msg.type === 'extension.clearBrowsingData')
           this.emit('clearBrowsingDataRequested')
 
+        if (msg.type === 'extension.support')
+          this.emit('supportRequested')
+
         if (msg.type === 'extension.openExternal')
           env.openExternal(Uri.parse(msg.params.url))
 

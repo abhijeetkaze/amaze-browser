@@ -6,6 +6,7 @@ import { BrowserClient, clearSavedCookies } from './BrowserClient'
 import { History } from './History'
 import { getConfig, getConfigs } from './Config'
 import { Panel } from './Panel'
+import { SupportPrompt } from './SupportPrompt'
 import type { DevToolsPosition } from './Panel'
 import type { ExtensionConfiguration } from './ExtensionConfiguration'
 
@@ -15,6 +16,7 @@ export class PanelManager extends EventEmitter.EventEmitter2 {
   public browser: BrowserClient
   public config: ExtensionConfiguration
   public readonly history: History
+  public readonly supportPrompt: SupportPrompt
 
   constructor(public readonly ctx: ExtensionContext) {
     super()
@@ -22,6 +24,8 @@ export class PanelManager extends EventEmitter.EventEmitter2 {
     this.config = getConfigs(this.ctx)
     this.history = new History(ctx.globalState)
     this.history.on('changed', entries => this.panels.forEach(p => p.postHistory(entries)))
+    this.supportPrompt = new SupportPrompt(ctx)
+    ctx.subscriptions.push(this.supportPrompt)
 
     this.on('windowOpenRequested', (params) => {
       this.create(params.url)
@@ -65,7 +69,11 @@ export class PanelManager extends EventEmitter.EventEmitter2 {
 
     panel.on('newTabRequested', () => this.create())
     panel.on('clearBrowsingDataRequested', () => this.clearBrowsingData())
-    panel.on('pageVisited', ({ url, title }) => this.history.add(url, title))
+    panel.on('pageVisited', ({ url, title }) => {
+      this.history.add(url, title)
+      this.supportPrompt.pageLoaded()
+    })
+    panel.on('supportRequested', () => this.supportPrompt.show())
     panel.on('ready', () => panel.postHistory(this.history.list()))
 
     panel.on('focus', () => {
@@ -136,10 +144,12 @@ export class PanelManager extends EventEmitter.EventEmitter2 {
   public async showHistory() {
     const entries = this.history.list()
     const clearItem = { label: '$(trash) Clear History and Cookies...', url: '' }
+    const supportItem = { label: '$(heart) Support Amaze Browser', url: '' }
     const picked = await window.showQuickPick(
       [
         ...entries.map(e => ({ label: e.title || e.url, description: e.title ? e.url : undefined, url: e.url })),
         clearItem,
+        supportItem,
       ],
       { placeHolder: entries.length ? 'Recently visited pages' : 'No history yet' },
     )
@@ -147,6 +157,8 @@ export class PanelManager extends EventEmitter.EventEmitter2 {
       return
     if (picked === clearItem)
       return this.clearBrowsingData()
+    if (picked === supportItem)
+      return this.supportPrompt.show()
     if (this.current)
       this.current.navigateTo(picked.url)
     else

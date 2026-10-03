@@ -8,7 +8,8 @@ import Screencast from '../screencast/screencast'
 import type { ScreencastFrame } from '../screencast/screencast'
 import { ErrorPage } from '../error-page/error-page'
 
-class Viewport extends React.Component<any, any> {
+// pure: frames are painted through paintFrame(), so this only renders when its props change
+class Viewport extends React.PureComponent<any, any> {
   private viewportRef: React.RefObject<HTMLDivElement>
   private screencast: Screencast | null = null
   private debouncedResizeHandler: any

@@ -16,6 +16,8 @@ import Connection from './connection'
 import type { ScreencastFrame } from './components/screencast/screencast'
 import { CDPHelper } from './utils/cdpHelper'
 import EngineStream from './engineStream'
+import { cursorAtExpression } from './utils/cursorAtPoint'
+import { nextZoomLevel, previousZoomLevel } from './utils/pageZoom'
 
 interface ElementSource {
   charNumber: number
@@ -60,9 +62,10 @@ interface IViewport {
     nodeId: string
     sourceMetadata: ElementSource | null
   } | null
-  highlightInfo: object | null
   deviceSizeRatio: number
   screenZoom: number
+  // zoom of the page itself, like a browser's Ctrl+=/Ctrl+-; screenZoom only fits the view to the window
+  pageZoom: number
 }
 
 class App extends React.Component<any, IState> {
@@ -75,6 +78,11 @@ class App extends React.Component<any, IState> {
   private readonly isMac = /macintosh|mac os x/i.test(navigator.userAgent)
   private isPanelVisible = true
   private engineStream: EngineStream | undefined
+  // the node under the pointer in inspect mode, compared by its stable backend id
+  private highlightedBackendNodeId: number | null = null
+  // latest pointer position waiting for a cursor lookup, at most one lookup is in flight
+  private cursorPosition: { x: number, y: number } | null = null
+  private isResolvingCursor = false
 
   constructor(props: any) {
     super(props)
@@ -103,7 +111,6 @@ class App extends React.Component<any, IState> {
         height: null,
         width: null,
         highlightNode: null,
-        highlightInfo: null,
         emulatedDeviceId: 'Responsive',
         isLoading: false,
         isFixedSize: false,
@@ -111,6 +118,7 @@ class App extends React.Component<any, IState> {
         isResizable: false,
         loadingPercent: 0.0,
         screenZoom: 1,
+        pageZoom: 1,
       },
     }
 
@@ -121,17 +129,33 @@ class App extends React.Component<any, IState> {
     this.handleFind = this.handleFind.bind(this)
     this.closeFind = this.closeFind.bind(this)
 
-    // Ctrl/Cmd+F opens our find bar; it must not reach the page or VS Code,
-    // which can only search the webview (a screenshot of the page)
+    // Ctrl/Cmd+F opens our find bar and Ctrl/Cmd+=/-/0 zoom the page; they must not
+    // reach the page or VS Code, which would search or zoom the webview (a screenshot of the page)
+    const zoomShortcuts: Record<string, string> = {
+      Equal: 'zoomIn',
+      NumpadAdd: 'zoomIn',
+      Minus: 'zoomOut',
+      NumpadSubtract: 'zoomOut',
+      Digit0: 'zoomReset',
+      Numpad0: 'zoomReset',
+    }
     window.addEventListener('keydown', (event) => {
-      if (this.state.isDebug || !(event.ctrlKey || event.metaKey) || event.altKey || event.code !== 'KeyF')
+      if (this.state.isDebug || !(event.ctrlKey || event.metaKey) || event.altKey)
         return
+      if (event.code === 'KeyF') {
+        if (this.state.isFindOpen)
+          this.findBar?.focus()
+        else
+          this.updateState({ isFindOpen: true, findResult: null })
+      }
+      else if (zoomShortcuts[event.code]) {
+        this.onToolbarActionInvoked(zoomShortcuts[event.code], {})
+      }
+      else {
+        return
+      }
       event.preventDefault()
       event.stopPropagation()
-      if (this.state.isFindOpen)
-        this.findBar?.focus()
-      else
-        this.updateState({ isFindOpen: true, findResult: null })
     }, true)
 
     // remember where the screencast was right-clicked, the page reports
@@ -285,14 +309,14 @@ class App extends React.Component<any, IState> {
       // TODO: Scroll the page
     })
 
-    // Initialize
+    // Initialize; DOM and Overlay are only enabled while inspecting, so Chromium
+    // doesn't track every node of the page the rest of the time.
+    // The screencast starts once the configuration arrives ('extension.appConfiguration').
     this.connection.send('Page.enable')
-    this.connection.send('DOM.enable')
-    this.connection.send('CSS.enable')
-    this.connection.send('Overlay.enable')
+    // once here and on device changes, not before every navigation
+    this.handleSetUserAgent()
 
     this.requestNavigationHistory()
-    this.startCasting()
 
     this.cdpHelper = new CDPHelper(this.connection)
 
@@ -305,17 +329,13 @@ class App extends React.Component<any, IState> {
     if (!this.viewport?.drawFrame(frame, frameDrawn))
       frameDrawn()
 
-    this.requestNodeHighlighting()
-
-    // the first frame after a resize has the new size
+    // the first frame at a new size resizes the view; other frames don't re-render anything
     if (this.nextViewportSize) {
-      this.updateState({
-        viewportMetadata: {
-          ...this.state.viewportMetadata,
-          ...this.nextViewportSize,
-        },
-      })
+      const size = this.nextViewportSize
       this.nextViewportSize = undefined
+      this.updateState({
+        viewportMetadata: { ...this.state.viewportMetadata, ...size },
+      })
     }
   }
 
@@ -550,12 +570,7 @@ class App extends React.Component<any, IState> {
         break
       case 'size':
         if (data.height !== undefined && data.width !== undefined) {
-          this.connection.send('Page.setDeviceMetricsOverride', {
-            deviceScaleFactor: window.devicePixelRatio || 1,
-            mobile: false,
-            height: Math.floor(data.height),
-            width: Math.floor(data.width),
-          })
+          this.setDeviceMetrics(data.width, data.height, this.state.viewportMetadata.pageZoom)
           this.nextViewportSize = {
             height: data.height,
             width: data.width,
@@ -564,6 +579,30 @@ class App extends React.Component<any, IState> {
 
         break
     }
+  }
+
+  // Zooming works like a browser's: the page gets a CSS viewport smaller by the zoom
+  // factor and a pixel ratio larger by it, so it re-lays out (media queries and
+  // devicePixelRatio follow) while frames keep the size of the view.
+  private setDeviceMetrics(width: number, height: number, pageZoom: number) {
+    this.connection.send('Page.setDeviceMetricsOverride', {
+      deviceScaleFactor: (window.devicePixelRatio || 1) * pageZoom,
+      mobile: false,
+      height: Math.floor(height / pageZoom),
+      width: Math.floor(width / pageZoom),
+    })
+  }
+
+  private setPageZoom(pageZoom: number) {
+    const { width, height } = this.state.viewportMetadata
+    if (pageZoom === this.state.viewportMetadata.pageZoom)
+      return
+
+    this.updateState({
+      viewportMetadata: { ...this.state.viewportMetadata, pageZoom },
+    })
+    if (width && height)
+      this.setDeviceMetrics(width, height, pageZoom)
   }
 
   private async updateState(newState: Partial<IState>) {
@@ -582,6 +621,11 @@ class App extends React.Component<any, IState> {
     )
 
     if (highlightNodeInfo) {
+      // same node as before: the page keeps the highlight on it by itself
+      if (highlightNodeInfo.backendNodeId === this.highlightedBackendNodeId)
+        return
+      this.highlightedBackendNodeId = highlightNodeInfo.backendNodeId
+
       let nodeId = highlightNodeInfo.nodeId
 
       if (!highlightNodeInfo.nodeId && highlightNodeInfo.backendNodeId) {
@@ -691,6 +735,15 @@ class App extends React.Component<any, IState> {
       case 'inspect':
         this.handleToggleInspect()
         break
+      case 'zoomIn':
+        this.setPageZoom(nextZoomLevel(this.state.viewportMetadata.pageZoom))
+        break
+      case 'zoomOut':
+        this.setPageZoom(previousZoomLevel(this.state.viewportMetadata.pageZoom))
+        break
+      case 'zoomReset':
+        this.setPageZoom(1)
+        break
       case 'emulateDevice':
         this.handleToggleDeviceEmulation()
         break
@@ -702,6 +755,9 @@ class App extends React.Component<any, IState> {
         break
       case 'clearBrowsingData':
         this.connection.send('extension.clearBrowsingData')
+        break
+      case 'support':
+        this.connection.send('extension.support')
         break
       case 'readClipboard':
         return this.connection.send('Clipboard.readText')
@@ -720,21 +776,26 @@ class App extends React.Component<any, IState> {
   }
 
   private handleToggleInspect() {
+    this.highlightedBackendNodeId = null
+
     if (this.state.isInspectEnabled) {
       // Hide browser highlight
       this.connection.send('Overlay.hideHighlight')
+      this.connection.send('Overlay.disable')
+      this.connection.send('DOM.disable')
 
       // Hide local highlight
       this.updateState({
         isInspectEnabled: false,
         viewportMetadata: {
           ...this.state.viewportMetadata,
-          highlightInfo: null,
           highlightNode: null,
         },
       })
     }
     else {
+      this.connection.send('DOM.enable')
+      this.connection.send('Overlay.enable')
       this.updateState({
         isInspectEnabled: true,
       })
@@ -742,7 +803,6 @@ class App extends React.Component<any, IState> {
   }
 
   private async handleNavigate(url: string) {
-    await this.handleSetUserAgent()
     const data: any = await this.connection.send('Page.navigate', { url })
     this.setState({ url, errorText: data.errorText })
   }
@@ -828,33 +888,43 @@ class App extends React.Component<any, IState> {
   }
 
   private async handleElementChanged(data: any) {
-    const nodeInfo: any = await this.connection.send('DOM.getNodeForLocation', {
-      x: data.params.position.x,
-      y: data.params.position.y,
-    })
+    this.cursorPosition = data.params.position
+    if (this.isResolvingCursor)
+      return
 
-    const cursor = await this.cdpHelper.getCursorForNode(nodeInfo)
-
-    this.setState({
-      viewportMetadata: {
-        ...this.state.viewportMetadata,
-        cursor,
-      },
-    })
+    this.isResolvingCursor = true
+    try {
+      // positions that arrive during a lookup collapse into one more lookup for the latest
+      while (this.cursorPosition) {
+        const { x, y } = this.cursorPosition
+        this.cursorPosition = null
+        const response: any = await this.connection.send('Runtime.evaluate', {
+          expression: cursorAtExpression(x, y),
+          returnByValue: true,
+          silent: true,
+        })
+        const cursor = response?.result?.value ?? null
+        if (cursor !== this.state.viewportMetadata.cursor) {
+          this.updateState({
+            viewportMetadata: { ...this.state.viewportMetadata, cursor },
+          })
+        }
+      }
+    }
+    catch {
+      // e.g. the page navigated away mid-lookup; the next move tries again
+    }
+    finally {
+      this.isResolvingCursor = false
+    }
   }
 
-  private async requestNodeHighlighting() {
+  private requestNodeHighlighting() {
     if (this.state.viewportMetadata.highlightNode) {
       const nodeId = this.state.viewportMetadata.highlightNode.nodeId
-      const highlightBoxModel: any = await this.connection.send(
-        'DOM.getBoxModel',
-        {
-          nodeId,
-        },
-      )
 
       // Trigger hightlight in regular browser.
-      await this.connection.send('Overlay.highlightNode', {
+      this.connection.send('Overlay.highlightNode', {
         nodeId,
         highlightConfig: {
           showInfo: true,
@@ -867,15 +937,6 @@ class App extends React.Component<any, IState> {
           marginColor: { r: 246, g: 178, b: 107, a: 0.66 },
         },
       })
-
-      if (highlightBoxModel && highlightBoxModel.model) {
-        this.setState({
-          viewportMetadata: {
-            ...this.state.viewportMetadata,
-            highlightInfo: highlightBoxModel.model,
-          },
-        })
-      }
     }
   }
 }

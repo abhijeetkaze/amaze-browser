@@ -18,6 +18,9 @@ class Screencast extends React.Component<any, any> {
   private drawRequest: number | null = null
   private hudTimer: number | undefined
   private stats = { drawn: 0, skipped: 0, latency: 0, hostDropped: 0, lastHostDropped: 0 }
+  // latest pointer position, resolved at most once per animation frame
+  private hoverPosition: { x: number, y: number } | null = null
+  private hoverFrameId: number | null = null
 
   constructor(props: any) {
     super(props)
@@ -28,6 +31,7 @@ class Screencast extends React.Component<any, any> {
     this.handleKeyEvent = this.handleKeyEvent.bind(this)
     this.draw = this.draw.bind(this)
     this.updateHud = this.updateHud.bind(this)
+    this.flushHover = this.flushHover.bind(this)
   }
 
   public componentDidMount() {
@@ -36,6 +40,8 @@ class Screencast extends React.Component<any, any> {
 
   public componentWillUnmount() {
     window.clearInterval(this.hudTimer)
+    if (this.hoverFrameId !== null)
+      window.cancelAnimationFrame(this.hoverFrameId)
     if (this.drawRequest)
       window.cancelAnimationFrame(this.drawRequest)
     this.nextBitmap?.close()
@@ -143,22 +149,15 @@ class Screencast extends React.Component<any, any> {
           position,
         })
       }
-      else if (event.type === 'mousemove') {
-        const position = this.convertIntoScreenSpace(event)
-        this.props.onInspectHighlightRequested({
-          position,
-        })
-      }
     }
     else {
       this.dispatchMouseEvent(event.nativeEvent)
     }
 
     if (event.type === 'mousemove') {
-      const position = this.convertIntoScreenSpace(event)
-      this.props.onMouseMoved({
-        position,
-      })
+      this.hoverPosition = this.convertIntoScreenSpace(event)
+      if (this.hoverFrameId === null)
+        this.hoverFrameId = window.requestAnimationFrame(this.flushHover)
     }
 
     if (event.type === 'mousedown') {
@@ -167,12 +166,31 @@ class Screencast extends React.Component<any, any> {
     }
   }
 
+  // cursor and inspect-highlight lookups cost page round trips, so they run once per frame for the latest position
+  private flushHover() {
+    this.hoverFrameId = null
+    const position = this.hoverPosition
+    if (!position)
+      return
+    this.hoverPosition = null
+
+    if (this.props.isInspectEnabled)
+      this.props.onInspectHighlightRequested({ position })
+    this.props.onMouseMoved({ position })
+  }
+
+  // webview pixels per CSS pixel of the page: the view's fit-to-window zoom times the page zoom
+  private get pixelScale() {
+    const { screenZoom, pageZoom = 1 } = this.props.viewportMetadata
+    return screenZoom * pageZoom
+  }
+
   private convertIntoScreenSpace(event: any) {
-    const { screenZoom } = this.props.viewportMetadata
+    const scale = this.pixelScale
 
     return {
-      x: Math.round(event.nativeEvent.offsetX / screenZoom),
-      y: Math.round(event.nativeEvent.offsetY / screenZoom),
+      x: Math.round(event.nativeEvent.offsetX / scale),
+      y: Math.round(event.nativeEvent.offsetY / scale),
     }
   }
 
@@ -256,10 +274,10 @@ class Screencast extends React.Component<any, any> {
     if (!(event.type in types))
       return
 
-    const { screenZoom } = this.props.viewportMetadata
+    const scale = this.pixelScale
 
-    const x = Math.round(event.offsetX / screenZoom)
-    const y = Math.round(event.offsetY / screenZoom)
+    const x = Math.round(event.offsetX / scale)
+    const y = Math.round(event.offsetY / scale)
 
     const type = (types as any)[event.type]
 
@@ -278,8 +296,8 @@ class Screencast extends React.Component<any, any> {
     }
 
     if (type === 'mouseWheel') {
-      params.deltaX = event.deltaX / screenZoom
-      params.deltaY = event.deltaY / screenZoom
+      params.deltaX = event.deltaX / scale
+      params.deltaY = event.deltaY / scale
     }
 
     this.props.onInteraction('Input.dispatchMouseEvent', params)
