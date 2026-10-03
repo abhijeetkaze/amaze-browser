@@ -26,10 +26,10 @@ function isLocalHost(host: string | undefined) {
   return !!host && LOCAL_HOSTNAMES.has(host.replace(/:\d+$/, ''))
 }
 
-// Browsers let any website open a WebSocket to localhost: only this server's own page may,
-// otherwise any site the user visits could drive the browser (and read its pages and cookies)
-function isOwnOrigin(req: IncomingMessage) {
-  return isLocalHost(req.headers.host) && req.headers.origin === `http://${req.headers.host}`
+// "host[:port]" of an http(s) origin, or undefined for anything else
+function originHost(origin: string | undefined) {
+  const match = origin?.match(/^https?:\/\/([^/]+)$/)
+  return match?.[1].toLowerCase()
 }
 
 // The webview gets VS Code's theme variables; a browser tab gets the defaults of VS Code's own themes
@@ -100,6 +100,8 @@ export class HttpServer {
   // session id (kept by the tab across reloads) → its view
   private readonly sessions = new Map<string, SocketView>()
   private readonly root: string
+  // the address VS Code forwards this server to, e.g. name-8100.app.github.dev with Codespaces
+  private forwardedHost: string | undefined
 
   constructor(extensionPath: string, private readonly onSession: (view: SocketView, url: string | undefined) => void) {
     this.root = join(extensionPath, 'dist', 'client')
@@ -112,7 +114,7 @@ export class HttpServer {
     })
     this.server.on('upgrade', (req, socket, head) => {
       const url = new URL(req.url || '/', 'http://localhost')
-      if (url.pathname !== '/ws' || !isOwnOrigin(req)) {
+      if (url.pathname !== '/ws' || !this.isOwnOrigin(req)) {
         socket.end('HTTP/1.1 403 Forbidden\r\n\r\n')
         return
       }
@@ -129,6 +131,27 @@ export class HttpServer {
         resolve()
       })
     })
+  }
+
+  // with VS Code Remote the page is opened through this address (http or https) as well
+  allowForwardedAddress(authority: string) {
+    if (!isLocalHost(authority))
+      this.forwardedHost = authority.toLowerCase()
+  }
+
+  // Names the page may be requested by: anything else is a website that re-pointed its domain here
+  private isAllowedHost(host: string | undefined) {
+    return isLocalHost(host) || (!!host && host.toLowerCase() === this.forwardedHost)
+  }
+
+  // Browsers let any website open a WebSocket to localhost: only this server's own page may,
+  // otherwise any site the user visits could drive the browser (and read its pages and cookies).
+  // A forwarding proxy may pass the public Host on, or replace it with localhost
+  private isOwnOrigin(req: IncomingMessage) {
+    const origin = originHost(req.headers.origin)
+    return this.isAllowedHost(req.headers.host)
+      && !!origin
+      && (origin === req.headers.host?.toLowerCase() || origin === this.forwardedHost)
   }
 
   get port() {
@@ -164,7 +187,7 @@ export class HttpServer {
   }
 
   private async handleRequest(req: IncomingMessage, res: ServerResponse) {
-    if (!isLocalHost(req.headers.host) || (req.method !== 'GET' && req.method !== 'HEAD')) {
+    if (!this.isAllowedHost(req.headers.host) || (req.method !== 'GET' && req.method !== 'HEAD')) {
       res.writeHead(403).end()
       return
     }
