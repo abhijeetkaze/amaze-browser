@@ -3,7 +3,8 @@
 //! The extension spawns it with `--cdp-port <port>`. It prints `{"port":..,"token":".."}` on
 //! stdout and exits when stdin closes (the extension host went away).
 //!
-//! The webview connects to `ws://127.0.0.1:<port>/?token=<token>&target=<page target id>`.
+//! The webview, or a browser tab served by the extension's HTTP server, connects to
+//! `ws://127.0.0.1:<port>/?token=<token>&target=<page target id>`.
 //! The engine opens its own CDP connection to that page and then:
 //! - webview → engine (text): `{"cmd":"start","params":{..}}` / `{"cmd":"stop"}` / `d` (frame decoded)
 //! - engine → webview (binary): one packet per frame, see `frame.rs`
@@ -248,9 +249,8 @@ fn is_error_for(message: &str, id: u64) -> bool {
 
 /// Checks the token and origin, returns the requested page target id.
 fn authorize(req: &Request, token: &str) -> Option<String> {
-    // only webviews may connect, not web pages open in some browser on this machine
     let origin = req.headers().get("origin")?.to_str().ok()?;
-    if !origin.starts_with("vscode-webview://") {
+    if !is_allowed_origin(origin) {
         return None;
     }
 
@@ -274,9 +274,41 @@ fn authorize(req: &Request, token: &str) -> Option<String> {
     Some(target.to_string())
 }
 
+/// Webviews, and browser tabs served by the extension's HTTP server on this machine. Other
+/// web pages are refused even before the token check.
+fn is_allowed_origin(origin: &str) -> bool {
+    if origin.starts_with("vscode-webview://") {
+        return true;
+    }
+    let Some(host) = origin.strip_prefix("http://") else {
+        return false;
+    };
+    // the whole host must match: "localhost.example.com" is not localhost
+    let name = match host.rsplit_once(':') {
+        Some((name, port)) if !port.is_empty() && port.bytes().all(|b| b.is_ascii_digit()) => name,
+        _ => host,
+    };
+    matches!(name, "localhost" | "127.0.0.1" | "[::1]")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn allows_webviews_and_local_http_server_tabs_only() {
+        assert!(is_allowed_origin("vscode-webview://1abc2def"));
+        assert!(is_allowed_origin("http://localhost:8100"));
+        assert!(is_allowed_origin("http://127.0.0.1:8100"));
+        assert!(is_allowed_origin("http://[::1]:8100"));
+        assert!(is_allowed_origin("http://localhost"));
+        assert!(!is_allowed_origin("http://localhost.example.com:8100"));
+        assert!(!is_allowed_origin("http://example.com"));
+        assert!(!is_allowed_origin("https://localhost:8100"));
+        assert!(!is_allowed_origin("http://localhost:8100/path"));
+        assert!(!is_allowed_origin("http://localhost:"));
+        assert!(!is_allowed_origin("null"));
+    }
 
     #[test]
     fn detects_error_for_command() {
