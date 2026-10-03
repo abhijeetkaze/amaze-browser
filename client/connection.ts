@@ -83,7 +83,10 @@ export default class Connection extends EventEmitter2 {
     if (url)
       params.set('url', url)
 
-    const socket = new WebSocket(`ws://${location.host}/ws?${params}`)
+    // next to the page, and wss: when the page came over https (e.g. a forwarded port)
+    const endpoint = new URL(`ws?${params}`, location.href)
+    endpoint.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
+    const socket = new WebSocket(endpoint)
     this.socket = socket
     socket.onopen = () => {
       this.queue.forEach(data => socket.send(data))
@@ -100,7 +103,7 @@ export default class Connection extends EventEmitter2 {
 
   // the page and its state live in VS Code: once the server answers again, reloading picks them up
   private reloadWhenServerIsBack() {
-    const retry = () => fetch('/', { method: 'HEAD', cache: 'no-store' })
+    const retry = () => fetch('./', { method: 'HEAD', cache: 'no-store' })
       .then(() => location.reload(), () => setTimeout(retry, 1000))
     setTimeout(retry, 500)
   }
