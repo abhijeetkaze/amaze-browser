@@ -9,6 +9,16 @@ export interface EngineEndpoint {
 // see engine/src/frame.rs for the packet layout
 const HEADER_LEN = 36
 
+// also used for frames the extension host sends to a browser tab
+export function parseFramePacket(packet: ArrayBuffer): ScreencastFrame {
+  const header = new DataView(packet, 0, HEADER_LEN)
+  return {
+    data: new Uint8Array(packet, HEADER_LEN),
+    metadata: { timestamp: header.getFloat64(0, true) || undefined },
+    droppedFrames: header.getUint32(32, true),
+  }
+}
+
 /**
  * Frames from the Rust engine: a direct WebSocket to it, so frames never pass
  * through the extension host. Calls onUnavailable whenever the socket closes on its own,
@@ -31,12 +41,7 @@ export default class EngineStream {
     this.socket.onmessage = (event) => {
       if (!(event.data instanceof ArrayBuffer))
         return
-      const header = new DataView(event.data, 0, HEADER_LEN)
-      onFrame({
-        data: new Uint8Array(event.data, HEADER_LEN),
-        metadata: { timestamp: header.getFloat64(0, true) || undefined },
-        droppedFrames: header.getUint32(32, true),
-      })
+      onFrame(parseFramePacket(event.data))
     }
     // closed without dispose(): can't connect (remote session), engine couldn't reach Chromium, or it exited
     this.socket.onclose = () => {

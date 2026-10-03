@@ -8,6 +8,7 @@ import { getConfig, getConfigs } from './Config'
 import { Panel } from './Panel'
 import { SupportPrompt } from './SupportPrompt'
 import type { DevToolsPosition } from './Panel'
+import type { PanelView } from './PanelView'
 import type { ExtensionConfiguration } from './ExtensionConfiguration'
 
 export class PanelManager extends EventEmitter.EventEmitter2 {
@@ -41,7 +42,8 @@ export class PanelManager extends EventEmitter.EventEmitter2 {
     }
   }
 
-  public async create(startUrl: string | Uri = this.config.startUrl) {
+  // `view` is where the panel shows, e.g. a browser tab; a new webview by default
+  public async create(startUrl: string | Uri = this.config.startUrl, view?: PanelView) {
     this.refreshSettings()
 
     if (!this.browser)
@@ -90,7 +92,7 @@ export class PanelManager extends EventEmitter.EventEmitter2 {
 
     this.panels.add(panel)
 
-    await panel.launch(startUrl.toString())
+    await panel.launch(startUrl.toString(), view)
 
     this.emit('windowCreated', panel)
 

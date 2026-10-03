@@ -47,8 +47,8 @@ export class BrowserPage extends EnhancedEventEmitter {
       this.page.removeExposedFunction(ExposedFunc.EmitCopy),
       this.page.removeExposedFunction(ExposedFunc.GetPaste),
       this.page.removeExposedFunction(ExposedFunc.EmitContextMenu),
-    ]).then(() => {
-      this.page.close()
+    ]).then(() => this.page.close()).catch(() => {
+      // the browser closed first, e.g. along with its last page
     })
   }
 
