@@ -2,7 +2,7 @@
   "publisher": "abhijeetkaze",
   "name": "amaze-browser",
   "displayName": "Amaze Browser",
-  "version": "0.3.9",
+  "version": "1.0.0",
   "packageManager": "pnpm@8.9.2",
   "description": "A fast embedded Chromium browser inside VS Code, with DevTools, device emulation and live preview.",
   "author": {
@@ -338,7 +338,7 @@
   "scripts": {
     "build:dev": "vite build && npm run build:ts",
     "publish": "ovsx publish --no-dependencies",
-    "pack": "vsce package --no-dependencies",
+    "pack": "node -e \"require('fs').mkdirSync('bin',{recursive:true})\" && vsce package --no-dependencies -o bin",
     "build": "rimraf dist && vite build && pnpm run build:ts --minify",
     "build:ts": "tsup src/extension.ts --external=vscode -d dist",
     "lint": "eslint .",
