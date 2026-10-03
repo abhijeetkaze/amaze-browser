@@ -142,6 +142,8 @@ Use `"request": "attach"` to attach to a page that's already open.
 | `amaze-browser.otherArgs` | | Extra Chromium command-line arguments |
 | `amaze-browser.format` | `jpeg` | Image format for rendering the page (`png` or `jpeg`) |
 | `amaze-browser.quality` | `80` | Image quality for rendering (lower is faster) |
+| `amaze-browser.engine` | `ts` | Which engine streams the page preview. `rust` (experimental) uses a native process that sends frames straight to the preview; it falls back to `ts` when it can't start |
+| `amaze-browser.perfHud` | `false` | Show a performance overlay (frame rate, latency, dropped frames, memory) on the page preview |
 | `amaze-browser.everyNthFrame` | `1` | Render every Nth frame (higher is lighter on CPU) |
 | `amaze-browser.debugHost` | `localhost` | Host for the debugging connection |
 | `amaze-browser.debugPort` | `9222` | Port for the debugging connection. The next free port is used if it's taken |

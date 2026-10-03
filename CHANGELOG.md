@@ -3,6 +3,32 @@
 All notable changes to Amaze Browser are documented here.
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [1.5.0] - 2026-10-03
+
+### Added
+
+- An experimental Rust engine (`"amaze-browser.engine": "rust"`): a native process streams frames straight to the page preview, so they no longer pass through the extension host. It ships in packages for Linux (x64, arm64), macOS (Apple Silicon, Intel) and Windows (x64); elsewhere, or when it can't start, the default engine is used
+- Tabs of your own browser served by the HTTP server stream from the Rust engine too
+- The HTTP server's page also works through the address VS Code forwards it to with VS Code Remote (for example in Codespaces), over http or https
+- A performance overlay with frame rate, latency, dropped frames and memory (`amaze-browser.perfHud`)
+
+### Changed
+
+- Smoother preview: frames are sent as binary instead of base64, decoded off the main thread and drawn on a canvas, and only the newest frame is kept when the view falls behind
+- A hidden panel or background browser tab stops streaming until it's shown again
+
+## [1.4.1] - 2026-10-03
+
+### Fixed
+
+- The page served by the HTTP server could keep reloading itself. It now reconnects without reloading where it can, stops after 3 reloads in 30 seconds, and shows a bar saying why it isn't live: the page is open in another tab (with **Use here**), VS Code can't be reached, or the connection keeps dropping
+
+## [1.4.0] - 2026-10-03
+
+### Fixed
+
+- The HTTP server's page links its files and connection relative to its own address, so it also loads when served under a sub-path, for example behind a proxy at `/proxy/8100/`
+
 ## [1.3.0] - 2026-10-03
 
 ### Added
@@ -78,6 +104,9 @@ The first release of Amaze Browser, a fork of [Browse Lite](https://github.com/a
 - Panels moved to another window reconnect instead of coming back blank
 - No orange focus outline in inputs, broken-image icon before the first frame, or wrong viewport background
 
+[1.5.0]: https://github.com/abhijeetkaze/amaze-browser/releases/tag/v1.5.0
+[1.4.1]: https://github.com/abhijeetkaze/amaze-browser/releases/tag/v1.4.1
+[1.4.0]: https://github.com/abhijeetkaze/amaze-browser/releases/tag/v1.4.0
 [1.3.0]: https://github.com/abhijeetkaze/amaze-browser/releases/tag/v1.3.0
 [1.2.0]: https://github.com/abhijeetkaze/amaze-browser/releases/tag/v1.2.0
 [1.1.0]: https://github.com/abhijeetkaze/amaze-browser/releases/tag/v1.1.0

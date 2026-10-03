@@ -2,7 +2,7 @@
   "publisher": "abhijeetkaze",
   "name": "amaze-browser",
   "displayName": "Amaze Browser",
-  "version": "1.3.0",
+  "version": "1.5.0",
   "packageManager": "pnpm@8.9.2",
   "description": "A fast embedded Chromium browser inside VS Code, with DevTools, device emulation and live preview.",
   "author": {
