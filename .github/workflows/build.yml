@@ -4,6 +4,9 @@ on:
   push:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -32,3 +35,17 @@ jobs:
           name: amaze-browser-vsix
           path: bin/*.vsix
           if-no-files-found: error
+
+      # creates a GitHub release once per version in package.json
+      - name: Release
+        if: github.ref == 'refs/heads/main'
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if gh release view "v$version" >/dev/null 2>&1; then
+            echo "v$version is already released"
+            exit 0
+          fi
+          awk -v v="$version" '/^## \[/ { if (found) exit; found = index($0, "[" v "]") } found && !/^## \[/ && !/^\[.*\]: /' CHANGELOG.md > notes.md
+          gh release create "v$version" bin/*.vsix --title "v$version" --notes-file notes.md --target "$GITHUB_SHA"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
