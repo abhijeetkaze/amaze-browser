@@ -1,6 +1,6 @@
 import type { ChildProcess } from 'child_process'
 import { spawn } from 'child_process'
-import { existsSync } from 'fs'
+import { accessSync, chmodSync, constants, existsSync } from 'fs'
 import { join } from 'path'
 import { createInterface } from 'readline'
 
@@ -21,6 +21,18 @@ function findBinary(extensionPath: string) {
   ].find(p => existsSync(p))
 }
 
+// a VSIX unpacked without file modes leaves the binary non-executable
+function ensureExecutable(binary: string) {
+  if (process.platform === 'win32')
+    return
+  try {
+    accessSync(binary, constants.X_OK)
+  }
+  catch {
+    chmodSync(binary, 0o755)
+  }
+}
+
 /**
  * The Rust frame engine (engine/): owns a CDP connection per page and streams
  * binary frames to the webview, so frames skip the extension host entirely.
@@ -32,6 +44,12 @@ export class Engine {
     const binary = findBinary(extensionPath)
     if (!binary)
       return Promise.reject(new Error('amaze-engine binary not found'))
+    try {
+      ensureExecutable(binary)
+    }
+    catch (e) {
+      return Promise.reject(e)
+    }
 
     // stdin stays open: the engine exits when it closes, i.e. when the extension host goes away
     const child = spawn(binary, ['--cdp-port', String(cdpPort)], { stdio: ['pipe', 'pipe', 'inherit'] })

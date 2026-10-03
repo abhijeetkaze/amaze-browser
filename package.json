@@ -370,8 +370,9 @@
     "build:dev": "vite build && npm run build:ts",
     "publish": "ovsx publish --no-dependencies",
     "pack": "node -e \"require('fs').mkdirSync('bin',{recursive:true})\" && vsce package --no-dependencies -o bin",
-    "build": "rimraf dist && vite build && pnpm run build:ts --minify",
+    "build": "rimraf dist && vite build && pnpm run build:ts --minify && pnpm run build:engine",
     "build:ts": "tsup src/extension.ts --external=vscode -d dist",
+    "build:engine": "node scripts/build-engine.mjs",
     "lint": "eslint .",
     "release": "bumpp"
   },

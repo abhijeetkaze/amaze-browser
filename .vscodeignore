@@ -18,3 +18,4 @@ bin/**
 bench/**
 docs/**
 engine/**
+scripts/**
