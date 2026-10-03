@@ -3,6 +3,12 @@
 All notable changes to Amaze Browser are documented here.
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [1.0.1] - 2026-10-03
+
+### Changed
+
+- Removed the Preview label from the marketplace listing
+
 ## [1.0.0] - 2026-10-03
 
 The first release of Amaze Browser, a fork of [Browse Lite](https://github.com/antfu/vscode-browse-lite) published as `abhijeetkaze.amaze-browser`.
@@ -26,6 +32,7 @@ The first release of Amaze Browser, a fork of [Browse Lite](https://github.com/a
 ### Changed
 
 - Renamed commands, settings, the debugger type and context keys from `browse-lite.*` to `amaze-browser.*`
+[1.0.1]: https://github.com/abhijeetkaze/amaze-browser/releases/tag/v1.0.1
 
 ### Fixed
 
